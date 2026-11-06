@@ -20,6 +20,9 @@ const DEFAULTS = {
   label: { text: '', x: 120, y: 236, size: 22, color: '#ffffff', font: 'system-ui' },
   faceId: DEFAULT_ID,
   clockFont: 50,
+  dateFont: 18,
+  dateShortWeek: false,
+  dateShortMonth: false,
   analogBase: null,          // 'faces/analog_classic.watch' | 'faces/analog_color_x.watch' | null (digital)
   customHands: false,        // true = use the hands designed here instead of the template's own
   hands: structuredClone(HAND_PRESETS.swiss),
@@ -109,7 +112,18 @@ function renderBg() {
   bgx.restore();
 }
 
-// Approximation of the watch's own digits (text_id 50) and date (text_id 18).
+// Watch font IDs. The watch draws text with its own fonts; the file only picks an ID.
+// Sizes below are what we've seen (50 = big clock digits, 16/18 = date text). Others are unknown until tried.
+export const KNOWN_FONTS = { 50: { label: 'Big digits', px: 52 }, 18: { label: 'Small', px: 20 }, 16: { label: 'Small (date)', px: 18 } };
+const fontPx = id => KNOWN_FONTS[id]?.px ?? 52;
+
+function dateText(now) {
+  const wk = now.toLocaleDateString('en-US', { weekday: state.dateShortWeek ? 'short' : 'long' });
+  const mo = now.toLocaleDateString('en-US', { month: state.dateShortMonth ? 'short' : 'long' });
+  return `${wk}, ${mo} ${now.getDate()}`;
+}
+
+// Approximation of the watch's own digits and date.
 // ---- analog hands preview: the same sprites the watch will get (custom) or the template's own (original)
 const handCache = new Map();
 let originalSprites = null;            // Map id -> decoded sprite of the loaded template
@@ -152,9 +166,10 @@ function drawOverlay(ctx, now) {
   ctx.save();
   ctx.fillStyle = state.color;
   ctx.textBaseline = 'top'; ctx.textAlign = 'center';
-  ctx.font = '600 52px system-ui, "Segoe UI", Roboto, sans-serif';
+  const k = fontPx(state.clockFont) / 52;
+  ctx.font = `600 ${Math.round(52 * k)}px system-ui, "Segoe UI", Roboto, sans-serif`;
   ctx.shadowColor = 'rgba(0,0,0,.25)'; ctx.shadowBlur = 2;
-  const digit = (ch, dx) => ctx.fillText(ch, x + dx + 14, y - 2, 28);
+  const digit = (ch, dx) => ctx.fillText(ch, x + (dx + 14) * k, y - 2 * k, 28 * k);
   if (analogTemplateBytes) {
     ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
     // the watch steps its hands in 6 degree increments (that is how many sprites a face holds)
@@ -169,14 +184,12 @@ function drawOverlay(ctx, now) {
   }
   digit(hh[0], 0); digit(hh[1], 33);
   digit(mm[0], 77); digit(mm[1], 110);
-  ctx.fillText(':', x + 69.5, y - 5);
+  ctx.fillText(':', x + 69.5 * k, y - 5 * k);
   if (state.date.visible) {
     const d = state.date;
-    ctx.font = '600 16px system-ui, "Segoe UI", Roboto, sans-serif';
+    ctx.font = `600 ${fontPx(state.dateFont) <= 24 ? fontPx(state.dateFont) - 2 : 16}px system-ui, "Segoe UI", Roboto, sans-serif`;
     ctx.fillStyle = dateColor();
-    const txt = now.toLocaleDateString('en-US', { weekday: 'short' }) + ' ' +
-      now.toLocaleDateString('en-US', { month: 'short' }) + ' ' + String(now.getDate()).padStart(2, '0');
-    ctx.fillText(txt, d.x + DATE_W / 2, d.y + 1, DATE_W);
+    ctx.fillText(dateText(now), d.x + DATE_W / 2, d.y + 1, DATE_W);
   }
   ctx.restore();
 }
@@ -184,7 +197,8 @@ function drawOverlay(ctx, now) {
 let hover = null, dragging = null;
 
 function boxes() {
-  const out = [{ kind: 'clock', x: state.clock.x - 4, y: state.clock.y - 4, w: CLOCK_W + 8, h: CLOCK_H + 8 }];
+  const kk = fontPx(state.clockFont) / 52;
+  const out = [{ kind: 'clock', x: state.clock.x - 4, y: state.clock.y - 4, w: CLOCK_W * kk + 8, h: CLOCK_H * kk + 8 }];
   if (state.date.visible) out.push({ kind: 'date', x: state.date.x, y: state.date.y - 2, w: DATE_W, h: DATE_H + 4 });
   const lb = labelBox(); if (lb) out.push({ kind: 'label', ...lb });
   return out;
@@ -240,12 +254,14 @@ function buildLayout() {
   c.text_id = state.clockFont;
   for (const k of 'hmp') { c['color_r_' + k] = r; c['color_g_' + k] = g; c['color_b_' + k] = b; }
   const { x, y } = state.clock;
-  c.x_hour = x; c.y_hour = y; c.x_min = x + 77; c.y_min = y; c.x_point = x + 62; c.y_point = y - 3;
+  const k = fontPx(state.clockFont) / 52;
+  c.x_hour = x; c.y_hour = y; c.x_min = x + Math.round(77 * k); c.y_min = y; c.x_point = x + Math.round(62 * k); c.y_point = y - Math.round(3 * k);
   const d = lay.WATCH.text_month_week;
   const [dr, dg, db] = hexToRgb(dateColor());
   d.visible = state.date.visible ? 1 : 0;
   d.x = state.date.x; d.y = state.date.y;
   d.color_r = dr; d.color_g = dg; d.color_b = db;
+  d.text_id = state.dateFont; d.week_abbreviation = state.dateShortWeek ? 1 : 0; d.month_abbreviation = state.dateShortMonth ? 1 : 0;
   return lay;
 }
 
@@ -333,7 +349,15 @@ function syncInputs() {
   set('#dateX', state.date.x); set('#dateY', state.date.y);
   set('#labelText', state.label.text); set('#labelColor', state.label.color);
   set('#labelSize', state.label.size); set('#labelFont', state.label.font);
-  set('#faceId', state.faceId); set('#clockFont', String(state.clockFont));
+  set('#faceId', state.faceId); set('#clockFont', state.clockFont); set('#dateFont', state.dateFont);
+  set('#dateShortWeek', state.dateShortWeek, 'checked'); set('#dateShortMonth', state.dateShortMonth, 'checked');
+  const fname = id => KNOWN_FONTS[id] ? `${id} · ${KNOWN_FONTS[id].label}` : `${id} · untested`;
+  $('#clockFontOut').textContent = fname(state.clockFont);
+  $('#dateFontOut').textContent = fname(state.dateFont);
+  $$('#fontPicks button').forEach(b => b.classList.toggle('on', +b.dataset.f === state.clockFont));
+  $('#fontNote').textContent = KNOWN_FONTS[state.clockFont]
+    ? 'The watch draws digits with its own built-in font, and size comes from the font number. This preview approximates it.'
+    : `Font ${state.clockFont} hasn't been tried yet. Send it to see what the watch does (it may be another size or style, or fall back to the default). The preview uses the big size.`;
   $$('#swatches button').forEach(b => b.classList.toggle('on', b.dataset.c === state.color));
 }
 
@@ -665,10 +689,26 @@ function bindHandsUI() {
   $('#handCtl').append(...['hour', 'minute', 'second', 'cap'].map(row));
 
   $$('#clockMode button').forEach(b => b.onclick = async () => {
-    try { await setClockMode(b.dataset.mode); if (b.dataset.mode !== 'digital') drawPresets(); } catch (e) { toast(e.message, true); }
+    const label = b.textContent;
+    $$('#clockMode button').forEach(x => x.classList.toggle('on', x === b));
+    if (b.dataset.mode !== 'digital') b.textContent = 'Loading…';
+    try {
+      await setClockMode(b.dataset.mode);
+      if (b.dataset.mode !== 'digital') { drawPresets(); toast('Analog on: pick a hand design below'); $('#handsPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+      else toast('Digital clock');
+    } catch (e) { toast('Could not switch: ' + e.message, true); refreshClockUI(); }
+    finally { b.textContent = label; }
   });
   $('#handsOriginal').onclick = () => { state.customHands = false; state.handPreset = null; refreshClockUI(); invalidate(false); };
-  $('#clockFont').onchange = e => { state.clockFont = +e.target.value; invalidate(false); };
+  $('#clockFont').oninput = e => { state.clockFont = +e.target.value; invalidate(false); };
+  $('#dateFont').oninput = e => { state.dateFont = +e.target.value; invalidate(false); };
+  $('#dateShortWeek').onchange = e => { state.dateShortWeek = e.target.checked; invalidate(false); };
+  $('#dateShortMonth').onchange = e => { state.dateShortMonth = e.target.checked; invalidate(false); };
+  $('#fontPicks').append(...[50, 18, 16].map(f => {
+    const b = Object.assign(document.createElement('button'), { className: 'ghost', textContent: `${f} · ${KNOWN_FONTS[f].label}` });
+    b.dataset.f = f; b.onclick = () => { state.clockFont = f; invalidate(false); };
+    return b;
+  }));
   $('#handInfo').textContent = 'Hands are drawn in 16 angles per hand (6° steps) and packed into the face. The watch turns them for the other three quarters of the dial. Faces are about 0.5 to 0.8 MB, so sending takes 1 to 2 minutes.';
   bindHandsUI.show = drawPresets;
   refreshClockUI();

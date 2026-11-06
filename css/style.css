@@ -160,6 +160,9 @@ summary { cursor: pointer; color: var(--muted); font-size: 13px; }
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(30px); opacity: 0; background: #1c2030; border: 1px solid var(--line); padding: 10px 18px; border-radius: 12px; transition: .25s; pointer-events: none; z-index: 50; box-shadow: 0 10px 30px rgba(0,0,0,.5); max-width: 90vw; }
 .toast.show { opacity: 1; transform: translateX(-50%); }
 .toast.bad { border-color: rgba(251, 113, 133, .5); }
+.pill { min-width: 44px; text-align: center; padding: 4px 8px; border-radius: 99px; background: var(--bg2); border: 1px solid var(--line); font-size: 12px; }
+#fontPicks button { padding: 5px 10px; font-size: 12px; }
+#fontPicks button.on { border-color: var(--brand2); background: rgba(34,211,238,.12); }
 
 /* analog hands designer */
 .seg { display: flex; gap: 4px; padding: 4px; background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; }

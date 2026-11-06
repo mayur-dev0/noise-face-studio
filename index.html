@@ -9,8 +9,8 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
-  <link rel="stylesheet" href="css/style.css">
-  <script type="module" src="js/app.js"></script>
+  <link rel="stylesheet" href="css/style.css?v=5">
+  <script type="module" src="js/app.js?v=5"></script>
 </head>
 <body>
   <header class="top">
@@ -112,15 +112,11 @@
             <div class="swatches" id="swatches"></div>
           </div>
           <div class="row">
-            <label class="grow">Digit font
-              <select id="clockFont">
-                <option value="50">Font 50 (default, large)</option>
-                <option value="18">Font 18</option>
-                <option value="16">Font 16</option>
-              </select>
-            </label>
+            <label class="grow">Watch font <input type="range" id="clockFont" min="1" max="60" step="1"></label>
+            <output id="clockFontOut" class="pill"></output>
           </div>
-          <p class="muted">Fonts 50, 18 and 16 are the three the watch uses in the faces captured so far. Custom digit artwork needs one more capture (see Noise Lab → Capture → Digital face).</p>
+          <div class="row wrap" id="fontPicks"></div>
+          <p class="muted" id="fontNote"></p>
           <div class="row nums">
             <label>X <input type="number" id="clockX" min="0" max="101"></label>
             <label>Y <input type="number" id="clockY" min="3" max="230"></label>
@@ -138,6 +134,14 @@
           <div class="row nums">
             <label>X <input type="number" id="dateX" min="0" max="54"></label>
             <label>Y <input type="number" id="dateY" min="0" max="260"></label>
+          </div>
+          <div class="row">
+            <label class="check"><input type="checkbox" id="dateShortWeek"> Short weekday (Fri)</label>
+            <label class="check"><input type="checkbox" id="dateShortMonth"> Short month (Nov)</label>
+          </div>
+          <div class="row">
+            <label class="grow">Date font <input type="range" id="dateFont" min="1" max="60" step="1"></label>
+            <output id="dateFontOut" class="pill"></output>
           </div>
         </div>
 
