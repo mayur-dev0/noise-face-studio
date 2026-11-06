@@ -425,8 +425,21 @@ function bindFiles() {
   };
   $('#watchInput').onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
+    await importWatch(new Uint8Array(await f.arrayBuffer()), f.name);
+    e.target.value = '';
+  };
+  $('#resetAll').onclick = () => {
+    if (!confirm('Clear the current design?')) return;
+    localStorage.removeItem('nfs.state'); localStorage.removeItem('nfs.src');
+    state = structuredClone(DEFAULTS); usePreset('nebula'); toast('Fresh start');
+  };
+}
+
+async function importWatch(bytes, fname) {
+  const f = { name: fname };
+  {
     try {
-      const w = parseWatch(new Uint8Array(await f.arrayBuffer()));
+      const w = parseWatch(bytes);
       const info = [`${f.name}: ${w.size} bytes`, `images: ${w.images.map(i => `#${i.id} ${i.w}×${i.h}`).join(', ')}`];
       const img0 = w.images.find(i => i.w === W0 && i.h === H0) || w.images[0];
       if (!img0) throw new Error('No images inside this file');
@@ -450,13 +463,30 @@ function bindFiles() {
       $('#fileInfo').textContent = info.join('\n'); $('#fileInfo').hidden = false;
       invalidate(); toast('Face loaded into the editor');
     } catch (err) { toast(err.message, true); }
-    e.target.value = '';
+  }
+}
+
+// ------------------------------------------------------------------ Noise Lab bridge (only when served by noise_lab.py)
+async function bindLab() {
+  try {
+    const r = await fetch('/api/ping', { cache: 'no-store' });
+    if (!r.ok || (await r.json()).app !== 'noise-lab') return;
+  } catch { return; }
+  const b = Object.assign(document.createElement('button'), { className: 'ghost', textContent: '💾 Save to Noise Lab' });
+  $('.stage-actions').append(b);
+  b.onclick = async () => {
+    const name = prompt('Name for this face', 'myface'); if (!name) return;
+    try {
+      const res = await fetch('/api/faces/upload?name=' + encodeURIComponent(name), { method: 'POST', body: buildFile() });
+      const j = await res.json(); if (!res.ok) throw new Error(j.error);
+      toast('Saved to library as ' + j.name);
+    } catch (e) { toast(e.message, true); }
   };
-  $('#resetAll').onclick = () => {
-    if (!confirm('Clear the current design?')) return;
-    localStorage.removeItem('nfs.state'); localStorage.removeItem('nfs.src');
-    state = structuredClone(DEFAULTS); usePreset('nebula'); toast('Fresh start');
-  };
+  const load = new URLSearchParams(location.search).get('load');
+  if (load && load.startsWith('/files/')) {
+    const res = await fetch(load);
+    if (res.ok) await importWatch(new Uint8Array(await res.arrayBuffer()), load.split('/').pop());
+  }
 }
 
 // ------------------------------------------------------------------ bluetooth
@@ -538,4 +568,4 @@ function showSize() {
 }
 
 bindInputs(); bindCanvas(); bindFiles(); bindBle(); bindPwa(); showSize();
-restore();
+restore().then(bindLab);
