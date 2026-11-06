@@ -105,29 +105,44 @@ export function assemble(layoutText, bg, prev) {
   return concat([head, js, tbl, imgs]);
 }
 
-// Parse a .watch file (ours or a NoiseFit cloud face with the same container).
+// Parse a .watch file (ours or a NoiseFit cloud face with the same container, including analog faces).
 export function parseWatch(buf) {
   const d = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
   const dv = new DataView(d.buffer, d.byteOffset, d.byteLength);
   if (d.length < 28 || dv.getUint32(0, true) !== MAGIC) throw new Error('Not a Noise .watch file (bad magic)');
-  const [jsLen, , tblLen, , imgsLen] = [2, 3, 4, 5, 6].map(i => dv.getUint32(i * 4, true));
-  const jsStart = 28, tblStart = jsStart + jsLen, imgStart = tblStart + tblLen;
+  const [jsLen, tblOff, tblLen, imgOff, imgsLen] = [2, 3, 4, 5, 6].map(i => dv.getUint32(i * 4, true));
+  const jsStart = 28, tblStart = 4 + tblOff, imgStart = 4 + imgOff;
   if (imgStart + imgsLen > d.length) throw new Error('Truncated .watch file');
-  const raw = d.subarray(jsStart, tblStart);
+  const raw = d.subarray(jsStart, jsStart + jsLen);
   const end = raw.indexOf(0);
   const layoutText = new TextDecoder().decode(raw.subarray(0, end < 0 ? raw.length : end));
   let layout = null;
   try { layout = JSON.parse(layoutText); } catch { /* keep text only */ }
   const count = dv.getUint32(tblStart, true);
+  const hdr1 = dv.getUint32(imgStart + 4, true);
   const images = [];
   for (let i = 0; i < count; i++) {
     const o = tblStart + 4 + i * 16;
     const id = dv.getUint16(o, true), w = dv.getUint16(o + 2, true), h = dv.getUint16(o + 4, true);
-    const fmt = dv.getUint32(o + 8, true), off = dv.getUint32(o + 12, true);
-    const start = imgStart + off;
-    images.push({ id, w, h, fmt, offset: off, data: d.subarray(start, start + w * h * 2) });
+    const z = dv.getUint16(o + 6, true), fmt = dv.getUint32(o + 8, true), off = dv.getUint32(o + 12, true);
+    const nextOff = i + 1 < count ? dv.getUint32(o + 16 + 12, true) : d.length - (imgStart + (z ? hdr1 + 8 : 0));
+    const start = imgStart + (z ? hdr1 + 8 : 0) + off;
+    const byteLen = z ? Math.max(0, nextOff - off) : w * h * 2;
+    images.push({ id, w, h, z, fmt, offset: off, data: d.subarray(start, start + byteLen) });
   }
-  return { layoutText, layout, images, size: d.length };
+  return { layoutText, layout, images, size: d.length, raw: d };
+}
+
+// Replace background (id 0) and preview (id 1) in-place inside an existing .watch binary (preserves analog hands!).
+export function replaceWatchBackground(origBytes, bg565, pv565) {
+  const out = new Uint8Array(origBytes);
+  const w = parseWatch(out);
+  const dv = new DataView(out.buffer, out.byteOffset, out.byteLength);
+  const imgStart = 4 + dv.getUint32(20, true);
+  const i0 = w.images.find(i => i.id === 0), i1 = w.images.find(i => i.id === 1);
+  if (i0 && bg565.length === W0 * H0 * 2) out.set(bg565, imgStart + i0.offset);
+  if (i1 && pv565.length === W1 * H1 * 2) out.set(pv565, imgStart + i1.offset);
+  return out;
 }
 
 export function byteSum(data) {

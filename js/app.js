@@ -1,5 +1,6 @@
-import { W0, H0, W1, H1, DEFAULT_ID, defaultLayout, cjson, rgba565be, decode565be, assemble, parseWatch } from './format.js';
+import { W0, H0, W1, H1, DEFAULT_ID, defaultLayout, cjson, rgba565be, decode565be, assemble, parseWatch, replaceWatchBackground } from './format.js';
 import { NoiseLink, transfer, bleSupported } from './ble.js';
+import { sendNotification, ringCall } from './notify.js';
 import { PRESETS } from './presets.js';
 
 const $ = s => document.querySelector(s);
@@ -19,6 +20,7 @@ const DEFAULTS = {
 let state = structuredClone(DEFAULTS);
 let source = null;          // canvas holding the (downscaled) background source
 let sourceDataURL = null;   // persisted copy for uploaded / imported images
+let analogTemplateBytes = null; // when set, preserves the 49 analog hand sprites in the output .watch file!
 
 const bg = Object.assign(document.createElement('canvas'), { width: W0, height: H0 });
 const bgx = bg.getContext('2d', { willReadFrequently: true });
@@ -110,6 +112,22 @@ function drawOverlay(ctx, now) {
   ctx.font = '600 52px system-ui, "Segoe UI", Roboto, sans-serif';
   ctx.shadowColor = 'rgba(0,0,0,.25)'; ctx.shadowBlur = 2;
   const digit = (ch, dx) => ctx.fillText(ch, x + dx + 14, y - 2, 28);
+  if (analogTemplateBytes) {
+    const cx = 120, cy = 140;
+    const sec = now.getSeconds(), min = now.getMinutes() + sec / 60, hr = (now.getHours() % 12) + min / 60;
+    const hand = (ang, len, w, col, tail = 14) => {
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
+      ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(0, tail); ctx.lineTo(0, -len); ctx.stroke();
+      ctx.restore();
+    };
+    hand(hr * Math.PI / 6, 56, 7, '#ffffff');
+    hand(min * Math.PI / 30, 84, 5, '#e2e8f0');
+    hand(sec * Math.PI / 30, 94, 2, '#f97316', 20);
+    ctx.fillStyle = '#f97316'; ctx.beginPath(); ctx.arc(cx, cy, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    return;
+  }
   digit(hh[0], 0); digit(hh[1], 33);
   digit(mm[0], 77); digit(mm[1], 110);
   ctx.fillText(':', x + 69.5, y - 5);
@@ -196,6 +214,9 @@ function buildFile() {
   renderThumb();
   const bgPx = rgba565be(bgx.getImageData(0, 0, W0, H0).data);
   const pvPx = rgba565be(tx.getImageData(0, 0, W1, H1).data);
+  if (analogTemplateBytes) {
+    return replaceWatchBackground(analogTemplateBytes, bgPx, pvPx);
+  }
   return assemble(cjson(buildLayout()), bgPx, pvPx);
 }
 
@@ -449,6 +470,8 @@ async function importWatch(bytes, fname) {
       state.label = { ...state.label, text: '' };
       setSource(c, null, true);
       const tc = w.layout?.WATCH?.text_clock, tm = w.layout?.WATCH?.text_month_week;
+      const isAnalog = !!w.layout?.WATCH?.image_pointer_clock || w.images.length > 10;
+      analogTemplateBytes = isAnalog ? bytes : null;
       if (tc) {
         state.clock = { x: clamp(tc.x_hour ?? 48, 0, W0 - CLOCK_W), y: clamp(tc.y_hour ?? 20, 3, H0 - CLOCK_H) };
         if (tc.color_r_h != null) state.color = rgbToHex(tc.color_r_h, tc.color_g_h, tc.color_b_h);
@@ -458,7 +481,8 @@ async function importWatch(bytes, fname) {
         state.date = { ...state.date, x: clamp(tm.x ?? 27, 0, W0 - DATE_W), y: clamp(tm.y ?? 75, 0, H0 - DATE_H), visible: tm.visible !== 0, match: col === state.color, color: col };
       }
       const known = w.layout && Object.keys(w.layout.WATCH || {}).filter(k => !['image', 'text_clock', 'text_month_week'].includes(k));
-      if (known?.length) info.push(`note: extra elements not editable here: ${known.join(', ')}`);
+      if (isAnalog) info.push(`🕰 Analog face template active (${w.images.length} sprites preserved! You can swap the background photo and send to watch with real analog hands!)`);
+      else if (known?.length) info.push(`note: extra elements not editable here: ${known.join(', ')}`);
       info.push('', w.layoutText);
       $('#fileInfo').textContent = info.join('\n'); $('#fileInfo').hidden = false;
       invalidate(); toast('Face loaded into the editor');
@@ -472,6 +496,7 @@ async function bindLab() {
     const r = await fetch('/api/ping', { cache: 'no-store' });
     if (!r.ok || (await r.json()).app !== 'noise-lab') return;
   } catch { return; }
+  $('#labLink').hidden = false;
   const b = Object.assign(document.createElement('button'), { className: 'ghost', textContent: '💾 Save to Noise Lab' });
   $('.stage-actions').append(b);
   b.onclick = async () => {
@@ -487,6 +512,28 @@ async function bindLab() {
     const res = await fetch(load);
     if (res.ok) await importWatch(new Uint8Array(await res.arrayBuffer()), load.split('/').pop());
   }
+}
+
+// ------------------------------------------------------------------ analog templates
+function bindAnalog() {
+  const sync = name => {
+    $$('[data-analog]').forEach(b => b.classList.toggle('accent', b.dataset.analog === name));
+    $('#analogOff').hidden = !analogTemplateBytes;
+    $('#analogHint').textContent = analogTemplateBytes
+      ? '🕰 Analog mode: your photo goes behind real watch hands. Clock/date position settings are ignored.'
+      : 'Pick one: the watch draws real moving hands on top of your photo.';
+  };
+  $$('[data-analog]').forEach(b => b.onclick = async () => {
+    try {
+      const r = await fetch(b.dataset.analog);
+      if (!r.ok) throw new Error('Could not load ' + b.dataset.analog);
+      const bytes = new Uint8Array(await r.arrayBuffer());
+      parseWatch(bytes);
+      analogTemplateBytes = bytes;
+      sync(b.dataset.analog); invalidate(); toast('Analog hands on. Pick any photo or preset for the dial.');
+    } catch (e) { toast(e.message, true); }
+  });
+  $('#analogOff').onclick = () => { analogTemplateBytes = null; sync(null); invalidate(); };
 }
 
 // ------------------------------------------------------------------ bluetooth
@@ -510,6 +557,7 @@ function bindBle() {
     $('#connectBtn').disabled = !ok || c || busy;
     $('#disconnectBtn').disabled = !c;
     $('#sendBtn').disabled = !c || busy;
+    $('#nSend').disabled = $('#cRing').disabled = !c || busy;
   };
 
   $('#connectBtn').onclick = async () => {
@@ -549,6 +597,25 @@ function bindBle() {
       if (!$('#minimal').checked) log('Tip: retry once. If it keeps failing at the same step, enable "Log every Bluetooth packet" and keep the log.');
     } finally { busy = false; refresh(); wake?.release?.(); }
   };
+
+  // ---- notifications & calls (same BLE link)
+  const nlog = m => { const el = $('#nLog'); el.textContent += `[${new Date().toLocaleTimeString()}] ${m}\n`; el.scrollTop = el.scrollHeight; };
+  const guard = async (fn) => {
+    if (!link?.connected) { toast('Connect to the watch in the Send tab first', true); return showTab('send'); }
+    busy = true; refresh();
+    try { await fn(); } catch (e) { nlog('Failed: ' + e.message); toast(e.message, true); } finally { busy = false; refresh(); }
+  };
+  $('#nSend').onclick = () => guard(async () => {
+    const app = $('#nApp').value, t = $('#nTitle').value || 'Noise', b = $('#nBody').value || ' ';
+    nlog(`Sending ${app}: ${t} — ${b}`);
+    const acked = await sendNotification(link, app, t, b, $('#nNum').value.trim());
+    nlog(acked ? '✔ Watch acknowledged.' : 'Sent (no acknowledgement seen).');
+    toast(acked ? 'Notification delivered ✨' : 'Sent');
+  });
+  $('#cRing').onclick = () => guard(async () => {
+    await ringCall(link, $('#cName').value || 'Unknown', $('#cNum').value || '', +$('#cSec').value || 6, $('#cMissed').checked, nlog);
+    nlog('✔ Call finished.');
+  });
   refresh();
 }
 
@@ -567,5 +634,5 @@ function showSize() {
   $('#sizeInfo').textContent = `File size: ${(212660 / 1024).toFixed(0)} KB · about 880 Bluetooth packets`;
 }
 
-bindInputs(); bindCanvas(); bindFiles(); bindBle(); bindPwa(); showSize();
+bindInputs(); bindCanvas(); bindFiles(); bindBle(); bindAnalog(); bindPwa(); showSize();
 restore().then(bindLab);

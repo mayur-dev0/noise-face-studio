@@ -23,6 +23,7 @@
     </div>
     <div class="top-actions">
       <span id="bleBadge" class="badge"></span>
+      <a id="labLink" class="badge" href="/" hidden>🧪 Noise Lab</a>
       <button id="installBtn" class="ghost" hidden>Install app</button>
     </div>
   </header>
@@ -58,6 +59,7 @@
       <nav class="tabs" role="tablist">
         <button data-tab="design" class="active" role="tab">Design</button>
         <button data-tab="send" role="tab">Send</button>
+        <button data-tab="notify" role="tab">💬 Notify</button>
         <button data-tab="files" role="tab">Files</button>
         <button data-tab="about" role="tab">How it works</button>
       </nav>
@@ -72,6 +74,13 @@
           </label>
           <h3>Presets</h3>
           <div class="presets" id="presets"></div>
+          <h3>🕰 Analog (real watch hands)</h3>
+          <div class="row wrap" id="analogRow">
+            <button class="ghost" data-analog="faces/analog_classic.watch">Classic carbon</button>
+            <button class="ghost" data-analog="faces/analog_color_x.watch">Color X</button>
+            <button class="link" id="analogOff" hidden>✕ Back to digital</button>
+          </div>
+          <p class="muted" id="analogHint">Pick one: the watch draws real moving hands on top of your photo.</p>
         </div>
 
         <div class="card">
@@ -171,6 +180,39 @@
           </details>
           <pre class="log" id="log"></pre>
         </div>
+      </div>
+
+      <!-- Notify -->
+      <div class="tab" id="tab-notify">
+        <div class="card">
+          <h2>💬 Send a notification</h2>
+          <p class="muted">Uses the same Bluetooth connection as the Send tab. Connect there first.</p>
+          <div class="row">
+            <select id="nApp">
+              <option value="whatsapp">WhatsApp</option>
+              <option value="instagram">Instagram</option>
+              <option value="sms">SMS</option>
+              <option value="missed">Missed call</option>
+            </select>
+            <input type="text" id="nTitle" value="Jarvis 🤖" placeholder="Sender" class="grow">
+          </div>
+          <div class="row"><input type="text" id="nBody" value="Hello from NoiseFace Studio 🚀" placeholder="Message"></div>
+          <div class="row"><input type="text" id="nNum" placeholder="Phone number (optional)"></div>
+          <button id="nSend" class="accent big" disabled>💬 Push to watch</button>
+        </div>
+        <div class="card">
+          <h2>📞 Fake incoming call</h2>
+          <div class="row">
+            <input type="text" id="cName" value="Tony Stark" class="grow">
+            <input type="text" id="cNum" value="+919876543210" class="grow">
+          </div>
+          <div class="row nums">
+            <label>Ring seconds <input type="number" id="cSec" value="6" min="2" max="30"></label>
+            <label class="check"><input type="checkbox" id="cMissed" checked> Then show "Missed call"</label>
+          </div>
+          <button id="cRing" class="primary big" disabled>📞 Ring my watch</button>
+        </div>
+        <pre class="log" id="nLog"></pre>
       </div>
 
       <!-- Files -->
