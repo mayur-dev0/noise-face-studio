@@ -74,13 +74,24 @@
           </label>
           <h3>Presets</h3>
           <div class="presets" id="presets"></div>
-          <h3>🕰 Analog (real watch hands)</h3>
-          <div class="row wrap" id="analogRow">
-            <button class="ghost" data-analog="faces/analog_classic.watch">Classic carbon</button>
-            <button class="ghost" data-analog="faces/analog_color_x.watch">Color X</button>
-            <button class="link" id="analogOff" hidden>✕ Back to digital</button>
+        </div>
+
+        <div class="card" id="handsCard">
+          <h2>🕰 Clock style</h2>
+          <div class="seg" id="clockMode">
+            <button data-mode="digital" class="on">Digital</button>
+            <button data-mode="analog_classic">Analog + date</button>
+            <button data-mode="analog_clean">Analog clean</button>
           </div>
-          <p class="muted" id="analogHint">Pick one: the watch draws real moving hands on top of your photo.</p>
+          <p class="muted" id="analogHint"></p>
+          <div id="handsPanel" hidden>
+            <h3>Hand designs <span class="muted small">(made here, encoded in the watch's own format)</span></h3>
+            <div class="hand-presets" id="handPresets"></div>
+            <h3>Fine-tune</h3>
+            <div id="handCtl" class="hand-ctl"></div>
+            <div class="row"><button id="handsOriginal" class="ghost">↺ Use the face's original hands</button></div>
+            <p class="muted" id="handInfo"></p>
+          </div>
         </div>
 
         <div class="card">
@@ -100,6 +111,16 @@
             <input type="color" id="clockColor" aria-label="Clock colour">
             <div class="swatches" id="swatches"></div>
           </div>
+          <div class="row">
+            <label class="grow">Digit font
+              <select id="clockFont">
+                <option value="50">Font 50 (default, large)</option>
+                <option value="18">Font 18</option>
+                <option value="16">Font 16</option>
+              </select>
+            </label>
+          </div>
+          <p class="muted">Fonts 50, 18 and 16 are the three the watch uses in the faces captured so far. Custom digit artwork needs one more capture (see Noise Lab → Capture → Digital face).</p>
           <div class="row nums">
             <label>X <input type="number" id="clockX" min="0" max="101"></label>
             <label>Y <input type="number" id="clockY" min="3" max="230"></label>

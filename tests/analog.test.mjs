@@ -6,11 +6,11 @@ import { dirname, join } from 'node:path';
 import { parseWatch, replaceWatchBackground, frames, W0, H0, W1, H1 } from '../js/format.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const dir = join(here, '..', '..', 'captures', 'noise_analog_notify', 'faces');
+const dir = join(here, '..', 'faces');
 let fails = 0;
 const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails++; };
 
-for (const fn of ['face_1.watch', 'face_2.watch']) {
+for (const fn of ['analog_classic.watch', 'analog_color_x.watch']) {
   const p = join(dir, fn);
   if (!existsSync(p)) { console.log('SKIP', fn); continue; }
   const orig = new Uint8Array(readFileSync(p));

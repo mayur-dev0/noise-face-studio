@@ -1,6 +1,9 @@
 import { W0, H0, W1, H1, DEFAULT_ID, defaultLayout, cjson, rgba565be, decode565be, assemble, parseWatch, replaceWatchBackground } from './format.js';
 import { NoiseLink, transfer, bleSupported } from './ble.js';
 import { sendNotification, ringCall } from './notify.js';
+import { HAND_PRESETS, HAND_STYLES, SECOND_STYLES, CAP_STYLES, drawHand, capSprite } from './hands.js';
+import { decodeSprite, spriteToRGBA } from './sprite.js';
+import { buildHandsFace, analogIds } from './analog.js';
 import { PRESETS } from './presets.js';
 
 const $ = s => document.querySelector(s);
@@ -16,6 +19,10 @@ const DEFAULTS = {
   date: { x: 27, y: 75, visible: true, match: true, color: '#ffffff' },
   label: { text: '', x: 120, y: 236, size: 22, color: '#ffffff', font: 'system-ui' },
   faceId: DEFAULT_ID,
+  clockFont: 50,
+  analogBase: null,          // 'faces/analog_classic.watch' | 'faces/analog_color_x.watch' | null (digital)
+  customHands: false,        // true = use the hands designed here instead of the template's own
+  hands: structuredClone(HAND_PRESETS.swiss),
 };
 let state = structuredClone(DEFAULTS);
 let source = null;          // canvas holding the (downscaled) background source
@@ -103,6 +110,42 @@ function renderBg() {
 }
 
 // Approximation of the watch's own digits (text_id 50) and date (text_id 18).
+// ---- analog hands preview: the same sprites the watch will get (custom) or the template's own (original)
+const handCache = new Map();
+let originalSprites = null;            // Map id -> decoded sprite of the loaded template
+function putSprite(s) {
+  const c = Object.assign(document.createElement('canvas'), { width: s.w, height: s.h });
+  c.getContext('2d').putImageData(new ImageData(spriteToRGBA(s), s.w, s.h), 0, 0);
+  return c;
+}
+function handCanvas(kind, angle) {
+  const custom = state.customHands;
+  const key = custom ? kind + JSON.stringify(state.hands[kind]) + '@' + angle : 'orig:' + state.analogBase + kind + '@' + angle;
+  let c = handCache.get(key);
+  if (c !== undefined) return c;
+  if (custom) {
+    c = putSprite(kind === 'cap' ? capSprite(state.hands) : drawHand(kind, state.hands, angle));
+  } else if (originalSprites) {
+    const ids = originalSprites.ids;
+    if (kind === 'cap') c = putSprite(originalSprites.map.get(ids.cap[0]));
+    else {
+      const quad = Math.floor(angle / 90) % 4, idx = Math.max(0, Math.min(15, Math.round((angle - quad * 90) / 6)));
+      const spr = putSprite(originalSprites.map.get(ids[kind][idx]));
+      c = Object.assign(document.createElement('canvas'), { width: 240, height: 280 });
+      const g = c.getContext('2d'); g.translate(120, 140); g.rotate(quad * Math.PI / 2); g.drawImage(spr, -120, -140);
+    }
+  } else c = null;
+  if (handCache.size > 400) handCache.clear();
+  handCache.set(key, c);
+  return c;
+}
+function loadOriginalSprites(bytes) {
+  try {
+    const w = parseWatch(bytes);
+    originalSprites = { ids: analogIds(w), map: new Map(w.images.filter(i => i.z === 1).map(i => [i.id, decodeSprite(i.data)])) };
+  } catch { originalSprites = null; }
+  handCache.clear();
+}
 function drawOverlay(ctx, now) {
   const { x, y } = state.clock;
   const hh = String(now.getHours()).padStart(2, '0'), mm = String(now.getMinutes()).padStart(2, '0');
@@ -113,18 +156,14 @@ function drawOverlay(ctx, now) {
   ctx.shadowColor = 'rgba(0,0,0,.25)'; ctx.shadowBlur = 2;
   const digit = (ch, dx) => ctx.fillText(ch, x + dx + 14, y - 2, 28);
   if (analogTemplateBytes) {
-    const cx = 120, cy = 140;
-    const sec = now.getSeconds(), min = now.getMinutes() + sec / 60, hr = (now.getHours() % 12) + min / 60;
-    const hand = (ang, len, w, col, tail = 14) => {
-      ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
-      ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(0, tail); ctx.lineTo(0, -len); ctx.stroke();
-      ctx.restore();
-    };
-    hand(hr * Math.PI / 6, 56, 7, '#ffffff');
-    hand(min * Math.PI / 30, 84, 5, '#e2e8f0');
-    hand(sec * Math.PI / 30, 94, 2, '#f97316', 20);
-    ctx.fillStyle = '#f97316'; ctx.beginPath(); ctx.arc(cx, cy, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+    // the watch steps its hands in 6 degree increments (that is how many sprites a face holds)
+    const sec = now.getSeconds(), m = now.getMinutes(), h = now.getHours() % 12;
+    const q = a => Math.floor(a / 6) * 6;
+    for (const [kind, ang] of [['hour', q((h * 60 + m) * 0.5)], ['minute', m * 6], ['second', sec * 6]]) {
+      const c = handCanvas(kind, ang); if (c) ctx.drawImage(c, 0, 0);
+    }
+    const cap = handCanvas('cap', 0); if (cap) ctx.drawImage(cap, 0, 0);
     ctx.restore();
     return;
   }
@@ -198,6 +237,7 @@ function buildLayout() {
   const lay = defaultLayout();
   const c = lay.WATCH.text_clock;
   const [r, g, b] = hexToRgb(state.color);
+  c.text_id = state.clockFont;
   for (const k of 'hmp') { c['color_r_' + k] = r; c['color_g_' + k] = g; c['color_b_' + k] = b; }
   const { x, y } = state.clock;
   c.x_hour = x; c.y_hour = y; c.x_min = x + 77; c.y_min = y; c.x_point = x + 62; c.y_point = y - 3;
@@ -215,7 +255,8 @@ function buildFile() {
   const bgPx = rgba565be(bgx.getImageData(0, 0, W0, H0).data);
   const pvPx = rgba565be(tx.getImageData(0, 0, W1, H1).data);
   if (analogTemplateBytes) {
-    return replaceWatchBackground(analogTemplateBytes, bgPx, pvPx);
+    const f = replaceWatchBackground(analogTemplateBytes, bgPx, pvPx);
+    return state.customHands ? buildHandsFace(f, state.hands) : f;
   }
   return assemble(cjson(buildLayout()), bgPx, pvPx);
 }
@@ -269,6 +310,10 @@ async function restore() {
     if (src) { setSource(fitCanvas(await loadImage(src)), null, true); }
     else usePreset(state.presetId || 'nebula', !s);
     Object.assign(state, keep);
+    if (state.analogBase) {
+      const mode = Object.keys(ANALOG_BASES).find(k => ANALOG_BASES[k] === state.analogBase);
+      if (mode) { await setClockMode(mode, { keep: true }); bindHandsUI.show?.(); }
+    }
   } catch { usePreset('nebula'); }
   invalidate();
 }
@@ -288,7 +333,7 @@ function syncInputs() {
   set('#dateX', state.date.x); set('#dateY', state.date.y);
   set('#labelText', state.label.text); set('#labelColor', state.label.color);
   set('#labelSize', state.label.size); set('#labelFont', state.label.font);
-  set('#faceId', state.faceId);
+  set('#faceId', state.faceId); set('#clockFont', String(state.clockFont));
   $$('#swatches button').forEach(b => b.classList.toggle('on', b.dataset.c === state.color));
 }
 
@@ -472,6 +517,8 @@ async function importWatch(bytes, fname) {
       const tc = w.layout?.WATCH?.text_clock, tm = w.layout?.WATCH?.text_month_week;
       const isAnalog = !!w.layout?.WATCH?.image_pointer_clock || w.images.length > 10;
       analogTemplateBytes = isAnalog ? bytes : null;
+      if (isAnalog) { state.analogBase = null; state.customHands = false; loadOriginalSprites(bytes); } else { originalSprites = null; state.analogBase = null; }
+      refreshClockUI();
       if (tc) {
         state.clock = { x: clamp(tc.x_hour ?? 48, 0, W0 - CLOCK_W), y: clamp(tc.y_hour ?? 20, 3, H0 - CLOCK_H) };
         if (tc.color_r_h != null) state.color = rgbToHex(tc.color_r_h, tc.color_g_h, tc.color_b_h);
@@ -514,26 +561,117 @@ async function bindLab() {
   }
 }
 
-// ------------------------------------------------------------------ analog templates
-function bindAnalog() {
-  const sync = name => {
-    $$('[data-analog]').forEach(b => b.classList.toggle('accent', b.dataset.analog === name));
-    $('#analogOff').hidden = !analogTemplateBytes;
-    $('#analogHint').textContent = analogTemplateBytes
-      ? '🕰 Analog mode: your photo goes behind real watch hands. Clock/date position settings are ignored.'
-      : 'Pick one: the watch draws real moving hands on top of your photo.';
-  };
-  $$('[data-analog]').forEach(b => b.onclick = async () => {
-    try {
-      const r = await fetch(b.dataset.analog);
-      if (!r.ok) throw new Error('Could not load ' + b.dataset.analog);
-      const bytes = new Uint8Array(await r.arrayBuffer());
-      parseWatch(bytes);
-      analogTemplateBytes = bytes;
-      sync(b.dataset.analog); invalidate(); toast('Analog hands on. Pick any photo or preset for the dial.');
-    } catch (e) { toast(e.message, true); }
+// ------------------------------------------------------------------ clock style: digital / analog + hand designer
+const ANALOG_BASES = { analog_classic: 'faces/analog_classic.watch', analog_clean: 'faces/analog_color_x.watch' };
+
+async function setClockMode(mode, { keep = false } = {}) {
+  if (mode === 'digital') {
+    analogTemplateBytes = null; originalSprites = null; state.analogBase = null; handCache.clear();
+  } else {
+    const path = ANALOG_BASES[mode];
+    const r = await fetch(path);
+    if (!r.ok) throw new Error('Could not load ' + path);
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    parseWatch(bytes);
+    analogTemplateBytes = bytes; state.analogBase = path;
+    loadOriginalSprites(bytes);
+    if (!keep) state.customHands = true;
+  }
+  refreshClockUI(); invalidate();
+}
+
+function refreshClockUI() {
+  const mode = !analogTemplateBytes ? 'digital' : state.analogBase === ANALOG_BASES.analog_clean ? 'analog_clean' : state.analogBase === ANALOG_BASES.analog_classic ? 'analog_classic' : 'imported';
+  $$('#clockMode button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+  $('#handsPanel').hidden = !analogTemplateBytes;
+  $('#analogHint').textContent = analogTemplateBytes
+    ? 'Analog: the watch draws moving hands over your background. The "Clock" and "Date" cards below only apply to digital faces.'
+    : 'Digital: the watch draws the time with its built-in font. Switch to analog to design your own hands.';
+  $$('#handPresets .hand-preset').forEach(b => b.classList.toggle('on', state.customHands && b.dataset.key === state.handPreset));
+  $('#handsOriginal').hidden = !analogTemplateBytes || !state.customHands;
+  syncHandControls();
+}
+
+const HAND_FIELDS = {
+  hour: [['len', 'Length', 20, 110, 1], ['w', 'Width', 2, 22, 0.5], ['tail', 'Tail', 0, 40, 1]],
+  minute: [['len', 'Length', 30, 118, 1], ['w', 'Width', 2, 20, 0.5], ['tail', 'Tail', 0, 40, 1]],
+  second: [['len', 'Length', 40, 125, 1], ['tail', 'Tail', 0, 45, 1]],
+};
+const HAND_TABLE = { hour: HAND_STYLES, minute: HAND_STYLES, second: SECOND_STYLES, cap: CAP_STYLES };
+const HAND_TITLE = { hour: 'Hour hand', minute: 'Minute hand', second: 'Second hand', cap: 'Centre cap' };
+
+function syncHandControls() {
+  $$('#handCtl [data-k]').forEach(el => {
+    if (document.activeElement === el) return;
+    const v = state.hands[el.dataset.kind][el.dataset.k];
+    el.value = v;
+    const out = el.nextElementSibling; if (out && out.tagName === 'OUTPUT') out.textContent = v;
   });
-  $('#analogOff').onclick = () => { analogTemplateBytes = null; sync(null); invalidate(); };
+}
+
+function bindHandsUI() {
+  // presets, each drawn with its own hands over a dark dial at 10:09:36
+  const prev = key => {
+    const d = HAND_PRESETS[key], c = Object.assign(document.createElement('canvas'), { width: 240, height: 280 }), g = c.getContext('2d');
+    const bgd = g.createRadialGradient(120, 140, 10, 120, 140, 150); bgd.addColorStop(0, '#20222c'); bgd.addColorStop(1, '#0a0a10');
+    g.fillStyle = bgd; g.fillRect(0, 0, 240, 280);
+    g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 2;
+    for (let k = 0; k < 12; k++) { g.save(); g.translate(120, 140); g.rotate(k * Math.PI / 6); g.beginPath(); g.moveTo(0, -112); g.lineTo(0, -122); g.stroke(); g.restore(); }
+    for (const [kind, a] of [['hour', 302], ['minute', 54], ['second', 216]]) g.drawImage(putSprite(drawHand(kind, d, a)), 0, 0);
+    g.drawImage(putSprite(capSprite(d)), 0, 0);
+    return c;
+  };
+  let drawn = false;
+  const drawPresets = () => {
+    if (drawn) return; drawn = true;
+    $('#handPresets').append(...Object.entries(HAND_PRESETS).map(([key, d]) => {
+      const b = Object.assign(document.createElement('button'), { className: 'hand-preset', title: d.name });
+      b.dataset.key = key;
+      const sp = document.createElement('span'); sp.textContent = d.name;
+      b.append(prev(key), sp);
+      b.onclick = () => { state.hands = structuredClone(HAND_PRESETS[key]); state.handPreset = key; state.customHands = true; refreshClockUI(); invalidate(false); };
+      return b;
+    }));
+  };
+
+  // fine-tune controls
+  const row = kind => {
+    const box = document.createElement('div'); box.className = 'hand-row';
+    const title = document.createElement('b'); title.textContent = HAND_TITLE[kind]; box.append(title);
+    const top = document.createElement('div'); top.className = 'top';
+    const sel = document.createElement('select');
+    for (const [id, s] of Object.entries(HAND_TABLE[kind])) sel.append(Object.assign(document.createElement('option'), { value: id, textContent: s.label }));
+    sel.dataset.kind = kind; sel.dataset.k = 'style';
+    sel.onchange = () => { state.hands[kind].style = sel.value; state.customHands = true; state.handPreset = null; refreshClockUI(); invalidate(false); };
+    top.append(sel);
+    const colors = kind === 'cap' ? [['color', 'Body'], ['accent', 'Centre']] : kind === 'second' ? [['color', 'Colour']] : [['color', 'Body'], ['lume', 'Lume']];
+    for (const [k, label] of colors) {
+      const inp = Object.assign(document.createElement('input'), { type: 'color', title: label });
+      inp.dataset.kind = kind; inp.dataset.k = k;
+      inp.oninput = () => { state.hands[kind][k] = inp.value; state.customHands = true; state.handPreset = null; invalidate(false); };
+      top.append(inp);
+    }
+    box.append(top);
+    for (const [k, label, min, max, step] of HAND_FIELDS[kind] || []) {
+      const lab = document.createElement('label'); lab.append(label);
+      const r = Object.assign(document.createElement('input'), { type: 'range', min, max, step });
+      r.dataset.kind = kind; r.dataset.k = k;
+      const out = document.createElement('output');
+      r.oninput = () => { state.hands[kind][k] = +r.value; out.textContent = r.value; state.customHands = true; state.handPreset = null; invalidate(false); };
+      lab.append(r, out); box.append(lab);
+    }
+    return box;
+  };
+  $('#handCtl').append(...['hour', 'minute', 'second', 'cap'].map(row));
+
+  $$('#clockMode button').forEach(b => b.onclick = async () => {
+    try { await setClockMode(b.dataset.mode); if (b.dataset.mode !== 'digital') drawPresets(); } catch (e) { toast(e.message, true); }
+  });
+  $('#handsOriginal').onclick = () => { state.customHands = false; state.handPreset = null; refreshClockUI(); invalidate(false); };
+  $('#clockFont').onchange = e => { state.clockFont = +e.target.value; invalidate(false); };
+  $('#handInfo').textContent = 'Hands are drawn in 16 angles per hand (6° steps) and packed into the face. The watch turns them for the other three quarters of the dial. Faces are about 0.5 to 0.8 MB, so sending takes 1 to 2 minutes.';
+  bindHandsUI.show = drawPresets;
+  refreshClockUI();
 }
 
 // ------------------------------------------------------------------ bluetooth
@@ -634,5 +772,5 @@ function showSize() {
   $('#sizeInfo').textContent = `File size: ${(212660 / 1024).toFixed(0)} KB · about 880 Bluetooth packets`;
 }
 
-bindInputs(); bindCanvas(); bindFiles(); bindBle(); bindAnalog(); bindPwa(); showSize();
+bindInputs(); bindCanvas(); bindFiles(); bindBle(); bindHandsUI(); bindPwa(); showSize();
 restore().then(bindLab);

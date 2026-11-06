@@ -1,6 +1,6 @@
 // Offline support: serve the app shell from cache, refresh it in the background.
-const CACHE = 'noiseface-v2';
-const SHELL = ['./', 'index.html', 'css/style.css', 'js/app.js', 'js/format.js', 'js/ble.js', 'js/notify.js', 'js/presets.js', 'icon.svg', 'manifest.webmanifest'];
+const CACHE = 'noiseface-v3';
+const SHELL = ['./', 'index.html', 'css/style.css', 'js/app.js', 'js/format.js', 'js/ble.js', 'js/notify.js', 'js/sprite.js', 'js/hands.js', 'js/analog.js', 'js/presets.js', 'icon.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
