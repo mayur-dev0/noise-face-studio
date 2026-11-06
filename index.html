@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>NoiseFace Studio: custom watch faces for Noise watches</title>
+  <meta name="description" content="Design custom watch faces for Noise smartwatches and install them over Bluetooth from your browser.">
+  <meta name="theme-color" content="#0a0c12">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <img src="icon.svg" alt="" width="36" height="36">
+      <div>
+        <h1>NoiseFace Studio</h1>
+        <p>Custom faces for Noise watches · 240×280</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span id="bleBadge" class="badge"></span>
+      <button id="installBtn" class="ghost" hidden>Install app</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Stage ------------------------------------------------------------ -->
+    <section class="stage">
+      <div class="watch">
+        <div class="strap"></div>
+        <div class="body">
+          <div class="crown"></div>
+          <div class="screen"><canvas id="screen" width="480" height="560" aria-label="Watch face preview"></canvas></div>
+        </div>
+        <div class="strap"></div>
+      </div>
+      <p class="hint">Drag the clock, date or text to move them. Drag anywhere else to move the photo. Scroll or pinch to zoom.</p>
+      <div class="stage-actions">
+        <button id="downloadBtn" class="primary">⬇ Download .watch</button>
+        <button id="gotoSend" class="accent">⌁ Send to watch</button>
+      </div>
+      <div class="thumb">
+        <canvas id="pickerPreview" width="184" height="210"></canvas>
+        <div>
+          <strong>Face-list thumbnail</strong>
+          <p>This 184×210 image goes into the file. The watch shows it in its face picker.</p>
+          <p class="muted" id="sizeInfo"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel ------------------------------------------------------------ -->
+    <section class="panel">
+      <nav class="tabs" role="tablist">
+        <button data-tab="design" class="active" role="tab">Design</button>
+        <button data-tab="send" role="tab">Send</button>
+        <button data-tab="files" role="tab">Files</button>
+        <button data-tab="about" role="tab">How it works</button>
+      </nav>
+
+      <!-- Design -->
+      <div class="tab active" id="tab-design">
+        <div class="card">
+          <h2>Background</h2>
+          <label class="drop" id="drop">
+            <input type="file" id="imgInput" accept="image/*" hidden>
+            <span>📷 Drop a photo here or <u>browse</u></span>
+          </label>
+          <h3>Presets</h3>
+          <div class="presets" id="presets"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Adjust photo</h2><button class="link" id="resetAdjust">Reset</button></div>
+          <div class="sliders">
+            <label>Zoom <input type="range" data-key="zoom" min="1" max="4" step="0.01"><output></output></label>
+            <label>Brightness <input type="range" data-key="bright" min="40" max="160" step="1"><output></output></label>
+            <label>Saturation <input type="range" data-key="sat" min="0" max="200" step="1"><output></output></label>
+            <label>Blur <input type="range" data-key="blur" min="0" max="10" step="0.5"><output></output></label>
+            <label>Darken <input type="range" data-key="dim" min="0" max="0.8" step="0.01"><output></output></label>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Clock</h2><button class="link" id="centerClock">Center</button></div>
+          <div class="row">
+            <input type="color" id="clockColor" aria-label="Clock colour">
+            <div class="swatches" id="swatches"></div>
+          </div>
+          <div class="row nums">
+            <label>X <input type="number" id="clockX" min="0" max="101"></label>
+            <label>Y <input type="number" id="clockY" min="3" max="230"></label>
+          </div>
+          <p class="muted">The watch draws the digits with its own built-in font. You choose the position and colour.</p>
+        </div>
+
+        <div class="card">
+          <h2>Date</h2>
+          <div class="row">
+            <label class="check"><input type="checkbox" id="dateVisible"> Show date</label>
+            <label class="check"><input type="checkbox" id="dateMatch"> Same colour as clock</label>
+            <input type="color" id="dateColor" aria-label="Date colour">
+          </div>
+          <div class="row nums">
+            <label>X <input type="number" id="dateX" min="0" max="54"></label>
+            <label>Y <input type="number" id="dateY" min="0" max="260"></label>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Your text <span class="muted small">(baked into the background)</span></h2>
+          <input type="text" id="labelText" placeholder="e.g. your name, a quote, an emoji ✨" maxlength="40">
+          <div class="row">
+            <select id="labelFont">
+              <option value="system-ui">Clean</option>
+              <option value="Georgia, serif">Serif</option>
+              <option value="'Courier New', monospace">Mono</option>
+              <option value="Impact, 'Arial Black', sans-serif">Bold</option>
+              <option value="'Brush Script MT', 'Segoe Script', cursive">Script</option>
+            </select>
+            <input type="color" id="labelColor" aria-label="Text colour">
+            <label class="grow">Size <input type="range" id="labelSize" min="10" max="60" step="1"></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Send -->
+      <div class="tab" id="tab-send">
+        <div class="card" id="bleUnsupported" hidden>
+          <h2>Bluetooth isn't available here</h2>
+          <p>Sending to the watch uses <b>Web Bluetooth</b>. It works in:</p>
+          <ul>
+            <li><b>Chrome on Android</b> (recommended, since your phone is already next to the watch)</li>
+            <li>Chrome or Edge on Windows, macOS, Linux or ChromeOS</li>
+          </ul>
+          <p>It does not work on iPhone/iPad or Firefox. The page must also be opened over <b>https://</b> (or localhost).
+             You can still design faces and <b>Download .watch</b> here, then send from another device.</p>
+        </div>
+
+        <div class="card">
+          <h2>Before you connect</h2>
+          <ol class="steps">
+            <li><b>Free the watch.</b> It talks to only one app at a time. On your phone, force-stop <b>NoiseFit</b> (Settings → Apps → NoiseFit → Force stop). If you're sending from a PC, turn the phone's Bluetooth off.</li>
+            <li>Keep the watch awake and close to this device.</li>
+            <li>Press <b>Connect</b> and pick your watch from the list.</li>
+          </ol>
+        </div>
+
+        <div class="card">
+          <div class="row">
+            <input type="text" id="namePrefix" placeholder="Name filter (optional), e.g. Noise" class="grow">
+            <button id="connectBtn" class="primary">Connect</button>
+            <button id="disconnectBtn" class="ghost" disabled>Disconnect</button>
+          </div>
+          <div class="status" id="connStatus">Not connected</div>
+          <button id="sendBtn" class="accent big" disabled>Send current face to watch</button>
+          <div class="progress"><div id="progressBar"></div><span id="progressText"></span></div>
+          <details>
+            <summary>Advanced</summary>
+            <div class="row nums">
+              <label>Face slot ID <input type="number" id="faceId" min="1" max="65535"></label>
+            </div>
+            <label class="check"><input type="checkbox" id="minimal"> Minimal handshake (skip device-info and sync steps)</label>
+            <label class="check"><input type="checkbox" id="verbose"> Log every Bluetooth packet</label>
+            <label class="check"><input type="checkbox" id="sendFile"> Send a .watch file instead of the current design</label>
+            <input type="file" id="sendFileInput" accept=".watch,.bin" hidden>
+          </details>
+          <pre class="log" id="log"></pre>
+        </div>
+      </div>
+
+      <!-- Files -->
+      <div class="tab" id="tab-files">
+        <div class="card">
+          <h2>Open a .watch file</h2>
+          <p>Load a face made here, or a NoiseFit cloud face you pulled from your phone. Its background, clock position and colours go into the editor.</p>
+          <label class="drop small-drop"><input type="file" id="watchInput" accept=".watch,.bin" hidden><span>📂 Choose .watch file</span></label>
+          <pre class="log small" id="fileInfo" hidden></pre>
+        </div>
+        <div class="card">
+          <h2>Export</h2>
+          <div class="row wrap">
+            <button id="dlWatch" class="primary">.watch file</button>
+            <button id="dlPng" class="ghost">Background PNG</button>
+            <button id="dlThumb" class="ghost">Thumbnail PNG</button>
+            <button id="dlProject" class="ghost">Project (.json)</button>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Open a project</h2>
+          <label class="drop small-drop"><input type="file" id="projectInput" accept=".json" hidden><span>🗂 Choose project .json</span></label>
+          <button class="link danger" id="resetAll">Start over (clear everything)</button>
+        </div>
+      </div>
+
+      <!-- About -->
+      <div class="tab" id="tab-about">
+        <div class="card prose">
+          <h2>How it works</h2>
+          <p>A Noise face is a single <code>cfg_res.watch</code> file. It holds:</p>
+          <ul>
+            <li>a JSON layout that sets where the watch draws the time and date, and in what colour,</li>
+            <li>a 240×280 background in RGB565,</li>
+            <li>a 184×210 thumbnail for the face picker.</li>
+          </ul>
+          <p>The file isn't encrypted or signed. This app builds it in your browser and sends it over Bluetooth Low Energy with
+             the same packet sequence NoiseFit uses: 241-byte chunks, an acknowledgement every 10 chunks, then a byte-sum and MD5 check.</p>
+          <h3>What you can change</h3>
+          <ul><li>Background art (any photo or preset), clock and date position and colour, and baked-in text or graphics.</li></ul>
+          <h3>What you can't change (yet)</h3>
+          <ul>
+            <li>The digit font and analog hands. The watch draws these from its firmware.</li>
+            <li>Menus, notifications and settings screens. These live in the firmware, not the face file.</li>
+          </ul>
+          <h3>Privacy</h3>
+          <p>Everything runs locally in your browser. Nothing is uploaded.</p>
+          <p class="muted">Not affiliated with Noise / Nexxbase. Use at your own risk. Re-installing any face from NoiseFit restores the stock look.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status"></div>
+</body>
+</html>

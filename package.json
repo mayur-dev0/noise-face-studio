@@ -1,0 +1,12 @@
+{
+  "name": "noise-face-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Web app to design custom watch faces for Noise smartwatches and install them over Web Bluetooth.",
+  "scripts": {
+    "test": "node tests/format.test.mjs",
+    "serve": "npx --yes http-server -p 8080 -c-1 ."
+  },
+  "license": "MIT"
+}
