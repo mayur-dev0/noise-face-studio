@@ -1049,6 +1049,7 @@ function renderFacesGrid(list, filter = '') {
       card.onmouseleave = () => card.style.borderColor = '#27272a';
       card.innerHTML = `
         <div>
+          <canvas class="face-thumb" width="120" height="140" style="width:100%; aspect-ratio:240/280; border-radius:10px; background:#000; display:block; margin-bottom:6px;"></canvas>
           <div style="font-weight:600; color:#f4f4f5; margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${item.name}">${item.name}</div>
           <div style="color:#71717a; font-size:11px; margin-bottom:8px;">${(item.size / 1024).toFixed(0)} KB</div>
         </div>
@@ -1067,8 +1068,29 @@ function renderFacesGrid(list, filter = '') {
         }
       };
       container.appendChild(card);
+      drawFaceThumb(item, card.querySelector('.face-thumb'));
     }
   }
+}
+
+const faceThumbCache = new Map();
+async function drawFaceThumb(item, cv) {
+  try {
+    let src = faceThumbCache.get(item.file);
+    if (!src) {
+      const r = await fetch(`faces/${item.file}`);
+      if (!r.ok) return;
+      const w = parseWatch(new Uint8Array(await r.arrayBuffer()));
+      const img = w.images.find(i => i.w === W0 && i.h === H0) || w.images[0];
+      if (!img) return;
+      src = Object.assign(document.createElement('canvas'), { width: img.w, height: img.h });
+      src.getContext('2d').putImageData(new ImageData(decode565be(img.data, img.w, img.h), img.w, img.h), 0, 0);
+      faceThumbCache.set(item.file, src);
+    }
+    const ctx = cv.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(src, 0, 0, cv.width, cv.height);
+  } catch (e) { console.warn('thumb failed', item.file, e); }
 }
 
 async function loadSavedFacesLibrary() {
