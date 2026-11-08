@@ -1060,6 +1060,11 @@ function renderFacesGrid(list, filter = '') {
           const buf = await r.arrayBuffer();
           document.querySelectorAll('.presets .preset.on').forEach(el => el.classList.remove('on'));
           card.classList.add('on');
+          if (item.kind === 'pulse3') {
+            if (!window.__installPulse3) throw new Error('Open the Send tab first');
+            await window.__installPulse3(new Uint8Array(buf), item.faceId, item.name);
+            return;
+          }
           await importWatch(new Uint8Array(buf), item.file);
           showTab('design');
         } catch (e) {
@@ -1074,6 +1079,17 @@ function renderFacesGrid(list, filter = '') {
 
 const faceThumbCache = new Map();
 async function drawFaceThumb(item, cv) {
+  if (item.kind === 'pulse3') {
+    // Native Pulse 3 files are compressed; the image codec is not decoded yet, so draw a labelled tile.
+    const ctx = cv.getContext('2d'), w = cv.width, h = cv.height;
+    const g = ctx.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#1e1b4b'); g.addColorStop(1, '#0e7490');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
+    ctx.font = 'bold 30px system-ui'; ctx.fillText('⌚', w / 2, h * 0.42);
+    ctx.font = 'bold 13px system-ui'; ctx.fillText('PULSE 3', w / 2, h * 0.6);
+    ctx.font = '11px system-ui'; ctx.fillStyle = '#a5f3fc'; ctx.fillText('tap to install', w / 2, h * 0.72);
+    return;
+  }
   try {
     let src = faceThumbCache.get(item.file);
     if (!src) {
@@ -1772,6 +1788,7 @@ function bindBle() {
 
   $('#sendBtn').onclick = async () => {
     if (!link?.connected) return;
+    if (link.p3) { toast('Pulse 3: install faces from the 📁 Saved Faces tab (Pulse 3 tiles).', true); return showTab('faces'); }
     const data = $('#sendFile').checked && fileToSend ? fileToSend : buildFile();
     busy = true; refresh(); setProg(0);
     log(`Sending ${data.length} bytes as face slot ${state.faceId}…`);
@@ -1785,6 +1802,21 @@ function bindBle() {
       toast('Transfer failed: ' + e.message, true);
       if (!$('#minimal').checked) log('Tip: retry once. If it keeps failing at the same step, enable "Log every Bluetooth packet" and keep the log.');
     } finally { busy = false; refresh(); wake?.release?.(); }
+  };
+
+  // ---- ColorFit Pulse 3 native faces (called from the Saved Faces tab)
+  window.__installPulse3 = async (bytes, faceId, name) => {
+    if (!link?.connected) { toast('Connect your ColorFit Pulse 3 in the Send tab first', true); return showTab('send'); }
+    if (!link.p3) { toast(`${link.name} is not a Pulse 3-family watch`, true); return; }
+    showTab('send'); busy = true; refresh(); setProg(0);
+    log(`Installing ${name} (${bytes.length} bytes) on ${link.name}…`);
+    let wake = null;
+    try { wake = await navigator.wakeLock?.request('screen'); } catch { /* optional */ }
+    try {
+      await link.p3.installFace(bytes, faceId, { onProgress: setProg });
+      setProg(1); toast('Face installed on your Pulse 3 ✨');
+    } catch (e) { log('Failed: ' + e.message); toast('Transfer failed: ' + e.message, true); }
+    finally { busy = false; refresh(); wake?.release?.(); }
   };
 
   // ---- notifications & calls (same BLE link)

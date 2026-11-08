@@ -1,6 +1,7 @@
 // Web Bluetooth uploader for Noise watches. Port of the transfer() routine in noise_face.py.
 // Characteristics (16-bit UUIDs): 0AF1 = control, 0AF6 = command/data, 0AF7 = notifications.
 import { frames, DEFAULT_ID } from './format.js';
+import { Pulse3 } from './pulse3.js';
 
 export const bleSupported = () => typeof navigator !== 'undefined' && !!navigator.bluetooth && window.isSecureContext;
 
@@ -49,7 +50,7 @@ export class NoiseLink {
   // Known NoiseFit watch families. Add a new entry here when a new watch protocol is captured.
   static FAMILIES = [
     { id: 'pulse2', label: 'ColorFit Pulse 2 family (0AF0)', faces: true, need: ['0af1', '0af6', '0af7'] },
-    { id: 'proto16186', label: 'Newer NoiseFit watch (16186F protobuf)', faces: false,
+    { id: 'proto16186', label: 'ColorFit Pulse 3 family (16186F)', faces: false, native: 'pulse3',
       need: ['16186f01-0000-1000-8000-00807f9b34fb', '16186f02-0000-1000-8000-00807f9b34fb'] },
   ];
 
@@ -90,6 +91,8 @@ export class NoiseLink {
             const b = new Uint8Array(v.buffer.slice(v.byteOffset, v.byteOffset + v.byteLength));
             if (this.verbose) this.log(`  ← ${id} ` + toHex(b));
             if (id === '0af7') this.q.push(b);
+            const full = c.uuid.toLowerCase();
+            if (full.startsWith('16186f0')) this.p3?.onNotify(full, b);
           });
           try { await c.startNotifications(); } catch (e) { this.log(`  (could not subscribe to ${id}: ${e.message})`); }
         }
@@ -104,7 +107,11 @@ export class NoiseLink {
       throw new Error(`No NoiseFit watch services found. Services: ${svcList || 'none'}. Pick your Noise watch, not another device.`);
     }
     this.log(`Connected to ${this.name} · ${this.family.label}. Services: ${svcList}`);
-    if (!this.family.faces) this.log('⚠ This watch uses a newer NoiseFit protocol. Connection works, but custom face upload is not decoded yet: install one face from NoiseFit with Bluetooth HCI logging on so the transfer can be captured.');
+    if (this.family.id === 'proto16186') {
+      this.p3 = new Pulse3(this);
+      try { await this.p3.hello(); } catch { /* optional */ }
+      this.log('ColorFit Pulse 3 protocol ready. Native Pulse 3 faces from Saved Faces can be installed.');
+    } else if (!this.family.faces) this.log('⚠ This watch uses a NoiseFit protocol that is not decoded yet. Install one face from NoiseFit with Bluetooth HCI logging on so it can be captured.');
   }
 
   get canSendFaces() { return !!this.family?.faces; }

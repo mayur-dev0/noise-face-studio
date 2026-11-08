@@ -1,5 +1,21 @@
 [
   {
+    "id": "p3_1423",
+    "file": "pulse3/face_1423.bin",
+    "name": "Cartoon Hip-Hop Mirror (Pulse 3)",
+    "kind": "pulse3",
+    "faceId": "1423",
+    "size": 63728
+  },
+  {
+    "id": "p3_659",
+    "file": "pulse3/face_659.bin",
+    "name": "Face 659 (Pulse 3)",
+    "kind": "pulse3",
+    "faceId": "659",
+    "size": 30464
+  },
+  {
     "id": "Hacked",
     "file": "Hacked.watch",
     "name": "Hacked",
