@@ -40,7 +40,7 @@ export const defaultLayout = () => JSON.parse(JSON.stringify(LAYOUT));
 export function cjson(o, depth = 0) {
   if (o && typeof o === 'object') {
     const t = '\t'.repeat(depth + 1);
-    const items = Object.entries(o).map(([k, v]) => `${t}"${k}":\t${cjson(v, depth + 1)}`).join(',\n');
+    const items = Object.entries(o).map(([k, v]) => `${t}"${k.replace(/__\d+$/, '')}":\t${cjson(v, depth + 1)}`).join(',\n');
     return `{\n${items}\n${'\t'.repeat(depth)}}`;
   }
   return String(o);
@@ -87,20 +87,33 @@ function u32s(...vals) {
   return b;
 }
 
-function imgEntry(id, w, h, offset) { // <HHHHII
+function imgEntry(id, w, h, offset, z = 0, fmt = 2) { // <HHHHII
   const b = new Uint8Array(16), dv = new DataView(b.buffer);
   dv.setUint16(0, id, true); dv.setUint16(2, w, true); dv.setUint16(4, h, true);
-  dv.setUint16(6, 0, true); dv.setUint32(8, 2, true); dv.setUint32(12, offset, true);
+  dv.setUint16(6, z, true); dv.setUint32(8, fmt, true); dv.setUint32(12, offset, true);
   return b;
 }
 
-export function assemble(layoutText, bg, prev) {
+export function assemble(layoutText, bg, prev, sprites = []) {
   const txt = new TextEncoder().encode(layoutText);
   const jsLen = txt.length + 1;
   const js = new Uint8Array(jsLen + ((4 - (jsLen % 4)) % 4)).fill(0xfd);
   js.set(txt); js[txt.length] = 0;
-  const tbl = concat([u32s(2), imgEntry(0, W0, H0, 8), imgEntry(1, W1, H1, 8 + bg.length)]);
-  const imgs = concat([u32s(8, 0), bg, prev, FOOTER]);
+  const count = 2 + sprites.length;
+  const sEntries = [];
+  let sOff = 0;
+  for (const s of sprites) {
+    sEntries.push(imgEntry(s.id, W0, H0, sOff, 1, count));
+    sOff += s.data.length;
+  }
+  const tbl = concat([
+    u32s(count),
+    imgEntry(0, W0, H0, 8, 0, count),
+    imgEntry(1, W1, H1, 8 + bg.length, 0, count),
+    ...sEntries,
+  ]);
+  const hdr1 = sprites.length ? 8 + bg.length + prev.length : 0;
+  const imgs = concat([u32s(8, hdr1), bg, prev, FOOTER, ...sprites.map(s => s.data)]);
   const head = u32s(MAGIC, 24, js.length, 24 + js.length, tbl.length, 24 + js.length + tbl.length, imgs.length);
   return concat([head, js, tbl, imgs]);
 }

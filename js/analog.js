@@ -46,18 +46,18 @@ export function replaceSprites(template, byId) {
 }
 
 /** design JSON -> every sprite the face needs */
-export function spritesForDesign(w, design) {
+export function spritesForDesign(w, design, extraLayers = null) {
   const ids = analogIds(w);
   const byId = new Map();
   for (const kind of ['hour', 'minute', 'second']) {
-    handFrames(kind, design).forEach((f, k) => byId.set(ids[kind][k], encodeSprite({ ...f, id: ids[kind][k] })));
+    handFrames(kind, design, extraLayers?.[kind] || []).forEach((f, k) => byId.set(ids[kind][k], encodeSprite({ ...f, id: ids[kind][k] })));
   }
   const cap = capSprite(design);
   for (const id of ids.cap) byId.set(id, encodeSprite({ ...cap, id }));
   return byId;
 }
 
-export function buildHandsFace(template, design) {
+export function buildHandsFace(template, design, extraLayers = null) {
   const d = template instanceof Uint8Array ? template : new Uint8Array(template);
-  return replaceSprites(d, spritesForDesign(parseWatch(d), design));
+  return replaceSprites(d, spritesForDesign(parseWatch(d), design, extraLayers));
 }

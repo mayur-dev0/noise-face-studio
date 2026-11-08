@@ -1,6 +1,6 @@
-// Offline support: serve the app shell from cache, refresh it in the background.
-const CACHE = 'noiseface-v3';
-const SHELL = ['./', 'index.html', 'css/style.css', 'js/app.js', 'js/format.js', 'js/ble.js', 'js/notify.js', 'js/sprite.js', 'js/hands.js', 'js/analog.js', 'js/presets.js', 'icon.svg', 'manifest.webmanifest'];
+// Offline support: network-first so updates appear immediately, falling back to cache offline.
+const CACHE = 'noiseface-v20';
+const SHELL = ['./', 'index.html', 'css/style.css', 'js/app.js', 'js/format.js', 'js/ble.js', 'js/notify.js', 'js/sprite.js', 'js/hands.js', 'js/motion.js', 'js/analog.js', 'js/presets.js', 'icon.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -13,8 +13,12 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(caches.open(CACHE).then(async cache => {
-    const hit = await cache.match(e.request, { ignoreSearch: true });
-    const net = fetch(e.request).then(r => { if (r.ok) cache.put(e.request, r.clone()); return r; }).catch(() => hit);
-    return hit || net;
+    try {
+      const r = await fetch(e.request);
+      if (r.ok) cache.put(e.request, r.clone());
+      return r;
+    } catch {
+      return (await cache.match(e.request, { ignoreSearch: true })) || Response.error();
+    }
   }));
 });

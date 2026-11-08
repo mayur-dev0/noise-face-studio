@@ -1,13 +1,85 @@
 import { W0, H0, W1, H1, DEFAULT_ID, defaultLayout, cjson, rgba565be, decode565be, assemble, parseWatch, replaceWatchBackground } from './format.js';
 import { NoiseLink, transfer, bleSupported } from './ble.js';
 import { sendNotification, ringCall } from './notify.js';
-import { HAND_PRESETS, HAND_STYLES, SECOND_STYLES, CAP_STYLES, drawHand, capSprite } from './hands.js';
+import { HAND_PRESETS, HAND_STYLES, SECOND_STYLES, CAP_STYLES, DIAL_STYLES, defaultDial, drawDialOverlay, drawHand, capSprite } from './hands.js';
 import { decodeSprite, spriteToRGBA } from './sprite.js';
 import { buildHandsFace, analogIds } from './analog.js';
-import { PRESETS } from './presets.js';
+import {
+  VIDEO_SCENES,
+  LOW_RES_PRESETS,
+  resolveLowResSpec,
+  quantizeLowResFrame,
+  renderLowResPreviewRgba,
+  analyzeGifFrames,
+  computeCleanBaseRgba,
+  renderSceneRgba,
+  buildVideoWatchSprites,
+  extractMediaFrames,
+  defaultMotion,
+} from './motion.js';
+import { PRESETS, PRESET_CATEGORIES } from './presets.js';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
+
+// ------------------------------------------------------------------ fonts catalog
+export const FONT_CATALOG = [
+  { group: 'Watch & System', items: [
+    { name: 'System Sans (Default)', family: 'system-ui, "Segoe UI", Roboto, sans-serif' },
+    { name: 'Impact / Bold Poster', family: 'Impact, "Arial Black", sans-serif' },
+    { name: 'Consolas / Terminal', family: 'ui-monospace, Consolas, monospace' },
+    { name: 'Georgia / Classic', family: 'Georgia, serif' },
+  ]},
+  { group: 'Digital · Sci-Fi · LED', items: [
+    { name: 'Orbitron (Sci-Fi)', family: '"Orbitron", sans-serif' },
+    { name: 'Audiowide (Futuristic)', family: '"Audiowide", sans-serif' },
+    { name: 'Wallpoet (Stencil LED)', family: '"Wallpoet", sans-serif' },
+    { name: 'VT323 (Pixel CRT)', family: '"VT323", monospace' },
+    { name: 'Share Tech Mono', family: '"Share Tech Mono", monospace' },
+    { name: 'Silkscreen (8-Bit)', family: '"Silkscreen", monospace' },
+    { name: 'Press Start 2P (Arcade)', family: '"Press Start 2P", monospace' },
+    { name: 'Michroma (Wide Tech)', family: '"Michroma", sans-serif' },
+    { name: 'Syncopate (Space Caps)', family: '"Syncopate", sans-serif' },
+    { name: 'Rajdhani (HUD Square)', family: '"Rajdhani", sans-serif' },
+    { name: 'Exo 2 (Cyber Sport)', family: '"Exo 2", sans-serif' },
+  ]},
+  { group: 'Bold · Display · Sport', items: [
+    { name: 'Bebas Neue (Tall)', family: '"Bebas Neue", sans-serif' },
+    { name: 'Anton (Heavy Block)', family: '"Anton", sans-serif' },
+    { name: 'Teko (Condensed Sport)', family: '"Teko", sans-serif' },
+    { name: 'Russo One (Tank)', family: '"Russo One", sans-serif' },
+    { name: 'Black Ops One (Military)', family: '"Black Ops One", sans-serif' },
+    { name: 'Righteous (Retro Wave)', family: '"Righteous", sans-serif' },
+    { name: 'Bungee (Urban Sign)', family: '"Bungee", sans-serif' },
+    { name: 'Monoton (Neon Lines)', family: '"Monoton", sans-serif' },
+    { name: 'Rubik Mono One (Chunky)', family: '"Rubik Mono One", monospace' },
+    { name: 'Oswald (Headline)', family: '"Oswald", sans-serif' },
+  ]},
+  { group: 'Modern · Geometric', items: [
+    { name: 'Montserrat (Geometric)', family: '"Montserrat", sans-serif' },
+    { name: 'Space Grotesk (Tech)', family: '"Space Grotesk", sans-serif' },
+    { name: 'Comfortaa (Rounded)', family: '"Comfortaa", cursive' },
+    { name: 'JetBrains Mono (Code)', family: '"JetBrains Mono", monospace' },
+  ]},
+  { group: 'Luxury · Editorial Serif', items: [
+    { name: 'Cinzel (Roman Dial)', family: '"Cinzel", serif' },
+    { name: 'Playfair Display (Luxury)', family: '"Playfair Display", serif' },
+    { name: 'Abril Fatface (Vogue)', family: '"Abril Fatface", serif' },
+    { name: 'DM Serif Display', family: '"DM Serif Display", serif' },
+    { name: 'Cormorant Garamond', family: '"Cormorant Garamond", serif' },
+    { name: 'Special Elite (Typewriter)', family: '"Special Elite", monospace' },
+  ]},
+  { group: 'Script · Handwritten · Brush', items: [
+    { name: 'Lobster (Bold Script)', family: '"Lobster", cursive' },
+    { name: 'Pacifico (Brush Surf)', family: '"Pacifico", cursive' },
+    { name: 'Permanent Marker', family: '"Permanent Marker", cursive' },
+    { name: 'Dancing Script', family: '"Dancing Script", cursive' },
+    { name: 'Great Vibes (Calligraphy)', family: '"Great Vibes", cursive' },
+    { name: 'Satisfy (Signature)', family: '"Satisfy", cursive' },
+    { name: 'Sacramento (Monoline)', family: '"Sacramento", cursive' },
+    { name: 'Shadows Into Light', family: '"Shadows Into Light", cursive' },
+  ]},
+];
 
 // ------------------------------------------------------------------ state
 const CLOCK_W = 139, CLOCK_H = 46, DATE_W = 186, DATE_H = 20;
@@ -16,8 +88,11 @@ const DEFAULTS = {
   zoom: 1, panX: 0, panY: 0, bright: 100, sat: 100, blur: 0, dim: 0,
   color: '#ffffff',
   clock: { x: 48, y: 20 },
+  clockSize: 52,
+  clockSpacing: 5,
+  clockFontFamily: 'system-ui, "Segoe UI", Roboto, sans-serif',
   date: { x: 27, y: 75, visible: true, match: true, color: '#ffffff' },
-  label: { text: '', x: 120, y: 236, size: 22, color: '#ffffff', font: 'system-ui' },
+  label: { text: '', x: 120, y: 236, size: 22, color: '#ffffff', font: 'system-ui, "Segoe UI", Roboto, sans-serif' },
   faceId: DEFAULT_ID,
   clockFont: 50,
   dateFont: 18,
@@ -26,11 +101,21 @@ const DEFAULTS = {
   analogBase: null,          // 'faces/analog_classic.watch' | 'faces/analog_color_x.watch' | null (digital)
   customHands: false,        // true = use the hands designed here instead of the template's own
   hands: structuredClone(HAND_PRESETS.swiss),
+  dial: defaultDial(),
+  motion: defaultMotion(),
 };
 let state = structuredClone(DEFAULTS);
 let source = null;          // canvas holding the (downscaled) background source
 let sourceDataURL = null;   // persisted copy for uploaded / imported images
 let analogTemplateBytes = null; // when set, preserves the 49 analog hand sprites in the output .watch file!
+
+// 10 FPS moving background runtime state
+let customMediaFrames = null;   // Array<HTMLCanvasElement> (240x280) from uploaded GIF/MP4/WebM
+let customMediaName = '';
+let sceneFrameCanvases = [];    // Cached Array<HTMLCanvasElement> (240x280) for active VIDEO_SCENES preset
+let sceneCacheKey = '';
+let motionFrameIdx = 0;
+let motionTimer = 0;
 
 const bg = Object.assign(document.createElement('canvas'), { width: W0, height: H0 });
 const bgx = bg.getContext('2d', { willReadFrequently: true });
@@ -42,6 +127,16 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const hexToRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 const rgbToHex = (r, g, b) => '#' + [r, g, b].map(v => (v | 0).toString(16).padStart(2, '0')).join('');
 const dateColor = () => (state.date.match ? state.color : state.date.color);
+
+function clockDims() {
+  const sz = state.clockSize || fontPx(state.clockFont) || 52;
+  const kk = sz / 52;
+  const sp = (state.clockSpacing ?? 5) - 5;
+  return {
+    w: Math.max(36, Math.round((CLOCK_W + sp * 3) * kk)),
+    h: Math.max(16, Math.round(CLOCK_H * kk)),
+  };
+}
 
 function toast(msg, bad = false) {
   const t = $('#toast');
@@ -73,9 +168,19 @@ function coverRect(sw, sh, W, H, zoom = 1) {
   return { s, w: sw * s, h: sh * s };
 }
 
+function getActiveMediaDimensions() {
+  if (isVideo10fpsActive()) {
+    const frames = ensureSceneFrames();
+    const f0 = frames[0];
+    if (f0) return { width: f0.width, height: f0.height };
+  }
+  if (source) return { width: source.width, height: source.height };
+  return { width: W0, height: H0 };
+}
+
 function clampPan() {
-  if (!source) return;
-  const { w, h } = coverRect(source.width, source.height, W0, H0, state.zoom);
+  const dims = getActiveMediaDimensions();
+  const { w, h } = coverRect(dims.width, dims.height, W0, H0, state.zoom);
   const mx = Math.max(0, (w - W0) / 2), my = Math.max(0, (h - H0) / 2);
   state.panX = clamp(state.panX, -mx, mx);
   state.panY = clamp(state.panY, -my, my);
@@ -89,10 +194,123 @@ function labelBox() {
   return { x: L.x - w / 2 - 4, y: L.y - L.size / 2 - 4, w: w + 8, h: L.size + 8 };
 }
 
-function renderBg() {
+function rgbaToCanvas(rgba, w = W0, h = H0) {
+  const c = Object.assign(document.createElement('canvas'), { width: w, height: h });
+  c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(rgba.buffer, rgba.byteOffset, rgba.byteLength), w, h), 0, 0);
+  return c;
+}
+
+function isVideo10fpsActive() {
+  return !analogTemplateBytes && !!state.motion?.enabled;
+}
+
+function ensureSceneFrames() {
+  if (state.motion?.scene === 'custom_media' && customMediaFrames?.length) {
+    return customMediaFrames;
+  }
+  const sceneKey = VIDEO_SCENES[state.motion?.scene] ? state.motion.scene : 'koi_sphere';
+  const total = clamp(state.motion?.frameCount || 16, 4, 24);
+  const accentColor = state.motion?.accentColor || VIDEO_SCENES[sceneKey].accent;
+  const secondaryColor = state.motion?.secondaryColor || VIDEO_SCENES[sceneKey].secondary;
+  const key = `${sceneKey}:${total}:${accentColor}:${secondaryColor}`;
+  if (key !== sceneCacheKey || sceneFrameCanvases.length !== total) {
+    sceneCacheKey = key;
+    sceneFrameCanvases = [];
+    for (let i = 0; i < total; i++) {
+      const rgba = renderSceneRgba(sceneKey, i, total, { accentColor, secondaryColor });
+      sceneFrameCanvases.push(rgbaToCanvas(rgba));
+    }
+    renderFilmstrip();
+  }
+  return sceneFrameCanvases;
+}
+
+function renderFilmstrip() {
+  const el = $('#motionFilmstrip');
+  if (!el) return;
+  const frames = isVideo10fpsActive() ? ensureSceneFrames() : [];
+  el.innerHTML = '';
+  if (!frames.length) return;
+  frames.forEach((fc, idx) => {
+    const item = Object.assign(document.createElement('div'), {
+      className: 'filmstrip-frame' + (idx === (motionFrameIdx % frames.length) ? ' active' : ''),
+      title: `Frame ${idx + 1} / ${frames.length} (click to inspect)`,
+    });
+    const c = Object.assign(document.createElement('canvas'), { width: 48, height: 56 });
+    c.getContext('2d').drawImage(fc, 0, 0, 48, 56);
+    const num = Object.assign(document.createElement('span'), { textContent: `#${idx + 1}` });
+    item.append(c, num);
+    item.onclick = () => {
+      motionFrameIdx = idx;
+      state.motion.playing = false;
+      syncMotionTimer();
+      refreshClockUI();
+      invalidate();
+    };
+    el.append(item);
+  });
+}
+
+function getMotionConvertOpts() {
+  return {
+    scene: state.motion?.scene || 'koi_sphere',
+    resolution: state.motion?.resolution || '80x80',
+    pixelSize: clamp(+(state.motion?.pixelSize || 1), 1, 4),
+    accentColor: state.motion?.accentColor || '#38bdf8',
+    secondaryColor: state.motion?.secondaryColor || '#e0f2fe',
+  };
+}
+
+function syncMotionTimer() {
+  if (motionTimer) { clearInterval(motionTimer); motionTimer = 0; }
+  if (!isVideo10fpsActive() || state.motion?.playing === false) return;
+  const fps = clamp(state.motion?.fps || 4, 1, 15);
+  motionTimer = setInterval(() => {
+    if (!isVideo10fpsActive() || state.motion?.playing === false) return;
+    const frames = ensureSceneFrames();
+    if (!frames.length) return;
+    motionFrameIdx = (motionFrameIdx + 1) % frames.length;
+    const strip = $('#motionFilmstrip');
+    if (strip) {
+      const items = strip.children;
+      for (let i = 0; i < items.length; i++) items[i].classList.toggle('active', i === motionFrameIdx);
+    }
+    renderBg();
+    renderScreen();
+  }, Math.round(1000 / fps));
+}
+
+function renderBg({ baseOnly = false, customFrameCanvas = null, rawFrame = false } = {}) {
   bgx.save();
   bgx.fillStyle = '#000'; bgx.fillRect(0, 0, W0, H0);
-  if (source) {
+  if (isVideo10fpsActive()) {
+    let frameCanvas = customFrameCanvas;
+    if (!frameCanvas) {
+      if (baseOnly) {
+        if (state.motion?.scene === 'custom_media' && customMediaFrames?.length) {
+          frameCanvas = customMediaFrames[0];
+        } else {
+          const sceneKey = VIDEO_SCENES[state.motion?.scene] ? state.motion.scene : 'koi_sphere';
+          const total = clamp(state.motion?.frameCount || 16, 4, 24);
+          const accentColor = state.motion?.accentColor || VIDEO_SCENES[sceneKey].accent;
+          const secondaryColor = state.motion?.secondaryColor || VIDEO_SCENES[sceneKey].secondary;
+          frameCanvas = rgbaToCanvas(renderSceneRgba(sceneKey, 0, total, { accentColor, secondaryColor, backgroundOnly: true }));
+        }
+      } else {
+        const frames = ensureSceneFrames();
+        frameCanvas = frames[motionFrameIdx % frames.length];
+      }
+    }
+    if (frameCanvas) {
+      clampPan();
+      const { w, h } = coverRect(frameCanvas.width, frameCanvas.height, W0, H0, state.zoom);
+      const dx = (W0 - w) / 2 + state.panX, dy = (H0 - h) / 2 + state.panY;
+      bgx.filter = `brightness(${state.bright}%) saturate(${state.sat}%)` + (state.blur ? ` blur(${state.blur}px)` : '');
+      const pad = state.blur * 3;
+      bgx.drawImage(frameCanvas, dx - pad, dy - pad, w + 2 * pad, h + 2 * pad);
+      bgx.filter = 'none';
+    }
+  } else if (source) {
     clampPan();
     const { w, h } = coverRect(source.width, source.height, W0, H0, state.zoom);
     const dx = (W0 - w) / 2 + state.panX, dy = (H0 - h) / 2 + state.panY;
@@ -102,6 +320,23 @@ function renderBg() {
     bgx.filter = 'none';
   }
   if (state.dim > 0) { bgx.fillStyle = `rgba(0,0,0,${state.dim})`; bgx.fillRect(0, 0, W0, H0); }
+  if (isVideo10fpsActive() && !baseOnly && !rawFrame && state.motion?.previewLowRes !== false) {
+    const cur = bgx.getImageData(0, 0, W0, H0);
+    let baseRgba;
+    if (state.motion?.scene === 'custom_media') {
+      baseRgba = computeCleanBaseRgba([cur.data]);
+    } else {
+      const sceneKey = VIDEO_SCENES[state.motion?.scene] ? state.motion.scene : 'koi_sphere';
+      const accentColor = state.motion?.accentColor || VIDEO_SCENES[sceneKey].accent;
+      const secondaryColor = state.motion?.secondaryColor || VIDEO_SCENES[sceneKey].secondary;
+      baseRgba = renderSceneRgba(sceneKey, 0, 16, { accentColor, secondaryColor, backgroundOnly: true });
+    }
+    const previewRgba = renderLowResPreviewRgba(cur.data, baseRgba, getMotionConvertOpts());
+    bgx.putImageData(new ImageData(new Uint8ClampedArray(previewRgba.buffer, previewRgba.byteOffset, previewRgba.byteLength), W0, H0), 0, 0);
+  }
+  if (analogTemplateBytes && state.dial?.style && state.dial.style !== 'none') {
+    drawDialOverlay(bgx, state.dial, 120, 140);
+  }
   const L = state.label;
   if (L.text) {
     bgx.font = `700 ${L.size}px ${L.font}`;
@@ -166,13 +401,23 @@ function drawOverlay(ctx, now) {
   ctx.save();
   ctx.fillStyle = state.color;
   ctx.textBaseline = 'top'; ctx.textAlign = 'center';
-  const k = fontPx(state.clockFont) / 52;
-  ctx.font = `600 ${Math.round(52 * k)}px system-ui, "Segoe UI", Roboto, sans-serif`;
+  const sz = state.clockSize || fontPx(state.clockFont) || 52;
+  const k = sz / 52;
+  const sp = (state.clockSpacing ?? 5) - 5;
+  const fam = state.clockFontFamily || 'system-ui, "Segoe UI", Roboto, sans-serif';
+  ctx.font = `700 ${Math.round(sz)}px ${fam}`;
   ctx.shadowColor = 'rgba(0,0,0,.25)'; ctx.shadowBlur = 2;
-  const digit = (ch, dx) => ctx.fillText(ch, x + (dx + 14) * k, y - 2 * k, 28 * k);
+  const digit = (ch, dx) => ctx.fillText(ch, x + (dx + 14) * k, y - 2 * k, 32 * k);
   if (analogTemplateBytes) {
     ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
-    // the watch steps its hands in 6 degree increments (that is how many sprites a face holds)
+    if (state.analogBase === ANALOG_BASES.analog_classic) {
+      // analog_classic.watch has firmware text_date (y=90) and text_week (y=170)
+      ctx.font = '700 16px system-ui, "Segoe UI", Roboto, sans-serif';
+      ctx.fillStyle = '#fa644b';
+      ctx.fillText(String(now.getDate()).padStart(2, '0'), 120, 90);
+      ctx.fillStyle = '#999999';
+      ctx.fillText(now.toLocaleDateString('en-US', { weekday: 'long' }), 120, 170);
+    }
     const sec = now.getSeconds(), m = now.getMinutes(), h = now.getHours() % 12;
     const q = a => Math.floor(a / 6) * 6;
     for (const [kind, ang] of [['hour', q((h * 60 + m) * 0.5)], ['minute', m * 6], ['second', sec * 6]]) {
@@ -182,9 +427,9 @@ function drawOverlay(ctx, now) {
     ctx.restore();
     return;
   }
-  digit(hh[0], 0); digit(hh[1], 33);
-  digit(mm[0], 77); digit(mm[1], 110);
-  ctx.fillText(':', x + 69.5 * k, y - 5 * k);
+  digit(hh[0], 0); digit(hh[1], 33 + sp);
+  digit(mm[0], 77 + sp * 2); digit(mm[1], 110 + sp * 3);
+  ctx.fillText(':', x + (69.5 + sp * 1.5) * k, y - 5 * k);
   if (state.date.visible) {
     const d = state.date;
     ctx.font = `600 ${fontPx(state.dateFont) <= 24 ? fontPx(state.dateFont) - 2 : 16}px system-ui, "Segoe UI", Roboto, sans-serif`;
@@ -197,8 +442,8 @@ function drawOverlay(ctx, now) {
 let hover = null, dragging = null;
 
 function boxes() {
-  const kk = fontPx(state.clockFont) / 52;
-  const out = [{ kind: 'clock', x: state.clock.x - 4, y: state.clock.y - 4, w: CLOCK_W * kk + 8, h: CLOCK_H * kk + 8 }];
+  const { w: cw, h: ch } = clockDims();
+  const out = [{ kind: 'clock', x: state.clock.x - 4, y: state.clock.y - 4, w: cw + 8, h: ch + 8 }];
   if (state.date.visible) out.push({ kind: 'date', x: state.date.x, y: state.date.y - 2, w: DATE_W, h: DATE_H + 4 });
   const lb = labelBox(); if (lb) out.push({ kind: 'label', ...lb });
   return out;
@@ -254,32 +499,125 @@ function buildLayout() {
   c.text_id = state.clockFont;
   for (const k of 'hmp') { c['color_r_' + k] = r; c['color_g_' + k] = g; c['color_b_' + k] = b; }
   const { x, y } = state.clock;
-  const k = fontPx(state.clockFont) / 52;
-  c.x_hour = x; c.y_hour = y; c.x_min = x + Math.round(77 * k); c.y_min = y; c.x_point = x + Math.round(62 * k); c.y_point = y - Math.round(3 * k);
+  const sz = state.clockSize || fontPx(state.clockFont) || 52;
+  const k = sz / 52;
+  const sp = state.clockSpacing ?? 5;
+  const dSp = sp - 5;
+  c.x_spacing_h = sp;
+  c.x_spacing_m = sp;
+  c.x_hour = x; c.y_hour = y;
+  c.x_min = x + Math.round((77 + dSp * 2) * k); c.y_min = y;
+  c.x_point = x + Math.round((62 + dSp * 1.5) * k); c.y_point = y - Math.round(3 * k);
   const d = lay.WATCH.text_month_week;
   const [dr, dg, db] = hexToRgb(dateColor());
   d.visible = state.date.visible ? 1 : 0;
   d.x = state.date.x; d.y = state.date.y;
   d.color_r = dr; d.color_g = dg; d.color_b = db;
   d.text_id = state.dateFont; d.week_abbreviation = state.dateShortWeek ? 1 : 0; d.month_abbreviation = state.dateShortMonth ? 1 : 0;
+  if (!analogTemplateBytes && state.motion?.enabled) {
+    // Keep HEAD.WATCH_NUM.num = 5 so the firmware parses text_clock & text_month_week!
+    // Place image_pointer_clock before text_clock so animation sprites draw underneath the digital clock & date.
+    lay.WATCH = {
+      image: lay.WATCH.image,
+      image_pointer_clock: { visible: 1, hour_id_start_time: 34, min_id_start_time: 2, sec_id_start_time: 18 },
+      text_clock: c,
+      text_month_week: d,
+    };
+  }
   return lay;
 }
 
 function buildFile() {
   if (dirtyBg) { renderBg(); dirtyBg = false; }
   renderThumb();
-  const bgPx = rgba565be(bgx.getImageData(0, 0, W0, H0).data);
   const pvPx = rgba565be(tx.getImageData(0, 0, W1, H1).data);
   if (analogTemplateBytes) {
+    const bgPx = rgba565be(bgx.getImageData(0, 0, W0, H0).data);
     const f = replaceWatchBackground(analogTemplateBytes, bgPx, pvPx);
     return state.customHands ? buildHandsFace(f, state.hands) : f;
   }
+  if (state.motion?.enabled) {
+    const mOpts = getMotionConvertOpts();
+    const sourceFrames = (state.motion.scene === 'custom_media' && customMediaFrames?.length)
+      ? customMediaFrames
+      : ensureSceneFrames();
+    const framesRgba = [];
+    for (let k = 0; k < 16; k++) {
+      const fc = sourceFrames[Math.min(sourceFrames.length - 1, Math.floor((k / 16) * sourceFrames.length))];
+      renderBg({ customFrameCanvas: fc, rawFrame: true });
+      framesRgba.push(new Uint8ClampedArray(bgx.getImageData(0, 0, W0, H0).data));
+    }
+    let baseRgba;
+    if (state.motion.scene === 'custom_media' && customMediaFrames?.length) {
+      baseRgba = computeCleanBaseRgba(framesRgba);
+    } else {
+      renderBg({ baseOnly: true, rawFrame: true });
+      baseRgba = new Uint8ClampedArray(bgx.getImageData(0, 0, W0, H0).data);
+    }
+    renderBg();
+    const bgPx = rgba565be(baseRgba);
+    return assemble(
+      cjson(buildLayout()),
+      bgPx,
+      pvPx,
+      buildVideoWatchSprites(framesRgba, baseRgba, mOpts)
+    );
+  }
+  const bgPx = rgba565be(bgx.getImageData(0, 0, W0, H0).data);
   return assemble(cjson(buildLayout()), bgPx, pvPx);
 }
 
 // ------------------------------------------------------------------ sources
+let lastUploadedMediaFile = null;
+
+async function loadAnimatedMediaFile(file, { keepAdjustments = false } = {}) {
+  try {
+    lastUploadedMediaFile = file;
+    const targetFrames = clamp(state.motion?.frameCount || 16, 4, 24);
+    const targetFps = clamp(state.motion?.fps || 4, 1, 15);
+    const spec = resolveLowResSpec(getMotionConvertOpts());
+    toast(`Converting ${file.name} → ${spec.preset.shortLabel} @ ${targetFps} FPS…`);
+    const res = await extractMediaFrames(file, { targetFrames, targetFps });
+    if (!res?.frames?.length) throw new Error('Could not extract frames from file');
+    customMediaFrames = res.frames.map(f => (f.canvas ? f.canvas : f));
+    customMediaName = file.name;
+    // Ensure we exit analog mode so the digital clock is shown and exported with WATCH_NUM = 5
+    analogTemplateBytes = null;
+    originalSprites = null;
+    state.analogBase = null;
+    state.motion.enabled = true;
+    state.motion.mode = 'video10fps';
+    state.motion.scene = 'custom_media';
+    state.motion.playing = true;
+    motionFrameIdx = 0;
+    const savedCrop = keepAdjustments ? { zoom: state.zoom, panX: state.panX, panY: state.panY } : null;
+    setSource(customMediaFrames[0], null, true);
+    if (savedCrop) Object.assign(state, savedCrop);
+    renderBg({ customFrameCanvas: customMediaFrames[0], rawFrame: true });
+    const f0 = new Uint8Array(bgx.getImageData(0, 0, W0, H0).data);
+    const midIdx = Math.floor(customMediaFrames.length / 2);
+    renderBg({ customFrameCanvas: customMediaFrames[midIdx], rawFrame: true });
+    const fMid = new Uint8Array(bgx.getImageData(0, 0, W0, H0).data);
+    const info = analyzeGifFrames([f0, fMid], f0);
+    state.motion.accentColor = info.accentColor;
+    state.motion.secondaryColor = info.secondaryColor;
+    handCache.clear();
+    bindMotionUI.show?.();
+    renderFilmstrip();
+    syncMotionTimer();
+    refreshClockUI();
+    invalidate();
+    toast(`🎬 Converted ${customMediaFrames.length} low-res frames (${spec.preset.shortLabel} · ${targetFps} FPS) from ${file.name}`);
+  } catch (e) {
+    toast('Could not decode animated file: ' + e.message, true);
+  }
+}
+
 async function useImageFile(file) {
-  if (!file || !file.type.startsWith('image/')) return toast('Please choose an image file', true);
+  if (!file) return;
+  const isAnim = file.type === 'image/gif' || file.type.startsWith('video/') || /\.(gif|mp4|webm|mov)$/i.test(file.name || '');
+  if (isAnim) return loadAnimatedMediaFile(file);
+  if (!file.type.startsWith('image/')) return toast('Please choose an image, GIF, or video file', true);
   const url = URL.createObjectURL(file);
   try {
     const img = await loadImage(url);
@@ -320,7 +658,23 @@ function save() {
 async function restore() {
   try {
     const s = JSON.parse(localStorage.getItem('nfs.state') || 'null');
-    if (s) state = { ...structuredClone(DEFAULTS), ...s, clock: { ...DEFAULTS.clock, ...s.clock }, date: { ...DEFAULTS.date, ...s.date }, label: { ...DEFAULTS.label, ...s.label } };
+    if (s) {
+      const defM = defaultMotion();
+      state = {
+        ...structuredClone(DEFAULTS),
+        ...s,
+        clock: { ...DEFAULTS.clock, ...s.clock },
+        date: { ...DEFAULTS.date, ...s.date },
+        label: { ...DEFAULTS.label, ...s.label },
+        dial: { ...defaultDial(), ...(s.dial || {}) },
+        motion: s.motion ? {
+          ...defM,
+          ...s.motion,
+          pixelSize: (!s.motion.resolution || s.motion.resolution === '80x80') ? 1 : (s.motion.pixelSize || 1),
+          mode: 'video10fps',
+        } : defM,
+      };
+    }
     const src = localStorage.getItem('nfs.src');
     const keep = { zoom: state.zoom, panX: state.panX, panY: state.panY };
     if (src) { setSource(fitCanvas(await loadImage(src)), null, true); }
@@ -328,13 +682,85 @@ async function restore() {
     Object.assign(state, keep);
     if (state.analogBase) {
       const mode = Object.keys(ANALOG_BASES).find(k => ANALOG_BASES[k] === state.analogBase);
-      if (mode) { await setClockMode(mode, { keep: true }); bindHandsUI.show?.(); }
+      if (mode) { await setClockMode(mode, { keep: true }); bindHandsUI.show?.(); bindDialUI.show?.(); }
+    } else if (state.motion?.enabled) {
+      if (state.motion.scene === 'custom_media' && !customMediaFrames?.length) {
+        state.motion.scene = 'koi_sphere';
+      }
+      bindMotionUI.show?.();
+      syncMotionTimer();
+      refreshClockUI();
     }
   } catch { usePreset('nebula'); }
   invalidate();
 }
 
 // ------------------------------------------------------------------ inputs
+function populateFontCatalog() {
+  const fillSelect = sel => {
+    sel.innerHTML = '';
+    for (const grp of FONT_CATALOG) {
+      const og = Object.assign(document.createElement('optgroup'), { label: grp.group });
+      for (const item of grp.items) {
+        const opt = Object.assign(document.createElement('option'), { value: item.family, textContent: item.name });
+        opt.style.fontFamily = item.family;
+        og.append(opt);
+      }
+      sel.append(og);
+    }
+  };
+  fillSelect($('#clockFontStyle'));
+  fillSelect($('#labelFont'));
+
+  const grid = $('#labelFontGrid');
+  grid.innerHTML = '';
+  for (const grp of FONT_CATALOG) {
+    for (const item of grp.items) {
+      const b = Object.assign(document.createElement('button'), { type: 'button', textContent: item.name.split(' (')[0], title: `${item.name} — Click for Your Text (Shift+Click for Clock)` });
+      b.style.fontFamily = item.family;
+      b.dataset.family = item.family;
+      b.onclick = e => {
+        if (e.shiftKey) {
+          state.clockFontFamily = item.family;
+          toast(`Clock font: ${item.name}`);
+          invalidate(false);
+        } else {
+          state.label.font = item.family;
+          if (!state.label.text) state.label.text = 'Noise ✨';
+          invalidate();
+        }
+      };
+      grid.append(b);
+    }
+  }
+}
+
+async function loadCustomFontFile(file, target) {
+  if (!file) return;
+  try {
+    const clean = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'CustomFont';
+    const familyName = `Custom_${clean}_${Date.now().toString(36).slice(-4)}`;
+    const buf = await file.arrayBuffer();
+    const ff = new FontFace(familyName, buf);
+    await ff.load();
+    document.fonts.add(ff);
+    const cssFamily = `"${familyName}", sans-serif`;
+    FONT_CATALOG[0].items.unshift({ name: `★ ${clean} (Uploaded)`, family: cssFamily });
+    populateFontCatalog();
+    if (target === 'clock') {
+      state.clockFontFamily = cssFamily;
+      invalidate(false);
+    } else {
+      state.label.font = cssFamily;
+      if (!state.label.text) state.label.text = clean;
+      invalidate();
+    }
+    toast(`Loaded font: ${clean}`);
+  } catch (err) {
+    toast('Could not load font file: ' + err.message, true);
+  }
+}
+
 function syncInputs() {
   $$('.sliders input').forEach(inp => {
     const v = state[inp.dataset.key];
@@ -342,13 +768,19 @@ function syncInputs() {
     const out = inp.nextElementSibling;
     out.textContent = inp.dataset.key === 'zoom' ? v.toFixed(2) + '×' : inp.dataset.key === 'dim' ? Math.round(v * 100) + '%' : inp.dataset.key === 'blur' ? v + 'px' : v + '%';
   });
-  const set = (sel, v, prop = 'value') => { const el = $(sel); if (document.activeElement !== el) el[prop] = v; };
+  const set = (sel, v, prop = 'value') => { const el = $(sel); if (el && document.activeElement !== el) el[prop] = v; };
   set('#clockColor', state.color); set('#clockX', state.clock.x); set('#clockY', state.clock.y);
+  set('#clockSize', state.clockSize || 52);
+  set('#clockSpacing', state.clockSpacing ?? 5);
+  set('#clockFontStyle', state.clockFontFamily || DEFAULTS.clockFontFamily);
+  if ($('#clockSizeOut')) $('#clockSizeOut').textContent = (state.clockSize || 52) + 'px';
   set('#dateVisible', state.date.visible, 'checked'); set('#dateMatch', state.date.match, 'checked');
   set('#dateColor', dateColor()); $('#dateColor').disabled = state.date.match;
   set('#dateX', state.date.x); set('#dateY', state.date.y);
   set('#labelText', state.label.text); set('#labelColor', state.label.color);
   set('#labelSize', state.label.size); set('#labelFont', state.label.font);
+  if ($('#labelSizeOut')) $('#labelSizeOut').textContent = state.label.size + 'px';
+  $$('#labelFontGrid button').forEach(b => b.classList.toggle('on', b.dataset.family === state.label.font));
   set('#faceId', state.faceId); set('#clockFont', state.clockFont); set('#dateFont', state.dateFont);
   set('#dateShortWeek', state.dateShortWeek, 'checked'); set('#dateShortMonth', state.dateShortMonth, 'checked');
   const fname = id => KNOWN_FONTS[id] ? `${id} · ${KNOWN_FONTS[id].label}` : `${id} · untested`;
@@ -356,16 +788,31 @@ function syncInputs() {
   $('#dateFontOut').textContent = fname(state.dateFont);
   $$('#fontPicks button').forEach(b => b.classList.toggle('on', +b.dataset.f === state.clockFont));
   $('#fontNote').textContent = KNOWN_FONTS[state.clockFont]
-    ? 'The watch draws digits with its own built-in font, and size comes from the font number. This preview approximates it.'
-    : `Font ${state.clockFont} hasn't been tried yet. Send it to see what the watch does (it may be another size or style, or fall back to the default). The preview uses the big size.`;
+    ? 'Adjust Clock size, Spacing, or Font style above, or pick a Watch font ID (50 = Large, 18 = Medium, 16 = Small).'
+    : `Font ${state.clockFont} hasn't been tried yet. Send it to see what the watch does (it may be another size or style, or fall back to the default).`;
   $$('#swatches button').forEach(b => b.classList.toggle('on', b.dataset.c === state.color));
 }
 
 function bindInputs() {
+  populateFontCatalog();
   $$('.sliders input').forEach(inp => inp.addEventListener('input', () => { state[inp.dataset.key] = +inp.value; invalidate(); }));
   $('#resetAdjust').onclick = () => { Object.assign(state, { zoom: 1, panX: 0, panY: 0, bright: 100, sat: 100, blur: 0, dim: 0 }); invalidate(); };
+  if ($('#centerBg')) {
+    $('#centerBg').onclick = () => { state.panX = 0; state.panY = 0; invalidate(); toast('Background centred'); };
+  }
 
   $('#clockColor').addEventListener('input', e => { state.color = e.target.value; invalidate(false); });
+  $('#clockFontStyle').onchange = e => { state.clockFontFamily = e.target.value; invalidate(false); };
+  $('#clockFontFile').onchange = e => { loadCustomFontFile(e.target.files[0], 'clock'); e.target.value = ''; };
+  $('#clockSize').addEventListener('input', e => {
+    const sz = +e.target.value;
+    state.clockSize = sz;
+    state.clockFont = sz >= 36 ? 50 : sz >= 22 ? 18 : 16;
+    const { w: cw, h: ch } = clockDims();
+    state.clock.x = clamp(state.clock.x, 0, Math.max(0, W0 - cw));
+    state.clock.y = clamp(state.clock.y, 2, Math.max(2, H0 - ch));
+    invalidate(false);
+  });
   const sw = ['#ffffff', '#fef3c7', '#fde047', '#fb923c', '#f43f5e', '#f0abfc', '#a78bfa', '#60a5fa', '#22d3ee', '#34d399', '#a3e635', '#111111'];
   $('#swatches').append(...sw.map(c => {
     const b = Object.assign(document.createElement('button'), { title: c });
@@ -374,11 +821,41 @@ function bindInputs() {
     return b;
   }));
   const num = (sel, fn) => $(sel).addEventListener('input', e => { if (e.target.value !== '') { fn(+e.target.value); invalidate(false); } });
-  num('#clockX', v => (state.clock.x = clamp(Math.round(v), 0, W0 - CLOCK_W)));
-  num('#clockY', v => (state.clock.y = clamp(Math.round(v), 3, H0 - CLOCK_H)));
+  num('#clockX', v => (state.clock.x = clamp(Math.round(v), 0, Math.max(0, W0 - clockDims().w))));
+  num('#clockY', v => (state.clock.y = clamp(Math.round(v), 2, Math.max(2, H0 - clockDims().h))));
+  num('#clockSpacing', v => (state.clockSpacing = clamp(Math.round(v), 0, 30)));
   num('#dateX', v => (state.date.x = clamp(Math.round(v), 0, W0 - DATE_W)));
   num('#dateY', v => (state.date.y = clamp(Math.round(v), 0, H0 - DATE_H)));
-  $('#centerClock').onclick = () => { state.clock.x = Math.round((W0 - CLOCK_W) / 2); state.date.x = Math.round((W0 - DATE_W) / 2); invalidate(false); };
+
+  $('#centerClock').onclick = () => {
+    const { w: cw } = clockDims();
+    state.clock.x = Math.round((W0 - cw) / 2);
+    invalidate(false);
+    toast('Clock centred horizontally');
+  };
+  if ($('#centerClockHV')) {
+    $('#centerClockHV').onclick = () => {
+      const { w: cw, h: ch } = clockDims();
+      state.clock.x = Math.round((W0 - cw) / 2);
+      state.clock.y = Math.round((H0 - ch) / 2);
+      invalidate(false);
+      toast('Clock centred on screen');
+    };
+  }
+  if ($('#centerDate')) {
+    $('#centerDate').onclick = () => {
+      state.date.x = Math.round((W0 - DATE_W) / 2);
+      invalidate(false);
+      toast('Date centred horizontally');
+    };
+  }
+  if ($('#centerLabel')) {
+    $('#centerLabel').onclick = () => {
+      state.label.x = Math.round(W0 / 2);
+      invalidate();
+      toast('Text centred horizontally');
+    };
+  }
 
   $('#dateVisible').onchange = e => { state.date.visible = e.target.checked; invalidate(false); };
   $('#dateMatch').onchange = e => { state.date.match = e.target.checked; if (!e.target.checked) state.date.color = state.color; invalidate(false); };
@@ -388,6 +865,7 @@ function bindInputs() {
   $('#labelColor').addEventListener('input', e => { state.label.color = e.target.value; invalidate(); });
   $('#labelSize').addEventListener('input', e => { state.label.size = +e.target.value; invalidate(); });
   $('#labelFont').onchange = e => { state.label.font = e.target.value; invalidate(); };
+  $('#labelFontFile').onchange = e => { loadCustomFontFile(e.target.files[0], 'label'); e.target.value = ''; };
   $('#faceId').addEventListener('input', e => { state.faceId = clamp(+e.target.value || DEFAULT_ID, 1, 65535); save(); });
 
   // background upload + drag & drop
@@ -398,11 +876,31 @@ function bindInputs() {
   drop.addEventListener('drop', e => useImageFile(e.dataTransfer.files[0]));
   document.addEventListener('paste', e => { const f = [...(e.clipboardData?.files || [])][0]; if (f) useImageFile(f); });
 
-  // presets
+  // preset category filters + 26 watchface presets
+  const catWrap = $('#presetCats');
+  if (catWrap && PRESET_CATEGORIES) {
+    catWrap.append(...PRESET_CATEGORIES.map((cat, idx) => {
+      const b = Object.assign(document.createElement('button'), {
+        type: 'button',
+        className: idx === 0 ? 'on' : '',
+        textContent: cat.id === 'all' ? `${cat.label} (${PRESETS.length})` : cat.label,
+      });
+      b.dataset.cat = cat.id;
+      b.onclick = () => {
+        $$('#presetCats button').forEach(x => x.classList.toggle('on', x === b));
+        $$('#presets .preset').forEach(p => {
+          p.hidden = cat.id !== 'all' && p.dataset.cat !== cat.id;
+        });
+      };
+      return b;
+    }));
+  }
+
   $('#presets').append(...PRESETS.map(p => {
     const b = Object.assign(document.createElement('button'), { className: 'preset', title: p.name });
     b.dataset.id = p.id;
-    const img = new Image(); img.alt = ''; img.src = p.draw().toDataURL('image/jpeg', 0.7);
+    b.dataset.cat = p.cat || 'scenic';
+    const img = new Image(); img.alt = ''; img.src = p.draw().toDataURL('image/jpeg', 0.75);
     const sp = document.createElement('span'); sp.textContent = p.name;
     b.append(img, sp);
     b.onclick = () => usePreset(p.id);
@@ -458,9 +956,11 @@ function bindCanvas() {
     const k = dragging.kind;
     if (k === 'bg') { state.panX += dx; state.panY += dy; invalidate(); }
     else if (k === 'clock') {
-      dragging.fx = (dragging.fx ?? state.clock.x) + dx; dragging.fy = (dragging.fy ?? state.clock.y) + dy;
-      state.clock.x = clamp(Math.round(dragging.fx), 0, W0 - CLOCK_W);
-      state.clock.y = clamp(Math.round(dragging.fy), 3, H0 - CLOCK_H);
+      dragging.fx = (dragging.fx ?? state.clock.x) + dx;
+      dragging.fy = (dragging.fy ?? state.clock.y) + dy;
+      const { w: cw, h: ch } = clockDims();
+      state.clock.x = clamp(Math.round(dragging.fx), 0, Math.max(0, W0 - cw));
+      state.clock.y = clamp(Math.round(dragging.fy), 2, Math.max(2, H0 - ch));
       invalidate(false);
     } else if (k === 'date') {
       dragging.fx = (dragging.fx ?? state.date.x) + dx; dragging.fy = (dragging.fy ?? state.date.y) + dy;
@@ -508,7 +1008,7 @@ function bindFiles() {
       if (p.app !== 'noiseface-studio') throw new Error('Not a NoiseFace project');
       const keep = { ...DEFAULTS, ...p.state };
       if (p.image) setSource(fitCanvas(await loadImage(p.image)), null, true); else usePreset(keep.presetId, false);
-      state = { ...keep, clock: { ...keep.clock }, date: { ...keep.date }, label: { ...keep.label } };
+      state = { ...keep, clock: { ...keep.clock }, date: { ...keep.date }, label: { ...keep.label }, dial: { ...defaultDial(), ...(keep.dial || {}) } };
       invalidate(); toast('Project loaded'); showTab('design');
     } catch (err) { toast(err.message, true); }
     e.target.value = '';
@@ -539,12 +1039,14 @@ async function importWatch(bytes, fname) {
       state.label = { ...state.label, text: '' };
       setSource(c, null, true);
       const tc = w.layout?.WATCH?.text_clock, tm = w.layout?.WATCH?.text_month_week;
-      const isAnalog = !!w.layout?.WATCH?.image_pointer_clock || w.images.length > 10;
+      const isAnalog = !tc && (!!w.layout?.WATCH?.image_pointer_clock || w.images.length > 10);
       analogTemplateBytes = isAnalog ? bytes : null;
       if (isAnalog) { state.analogBase = null; state.customHands = false; loadOriginalSprites(bytes); } else { originalSprites = null; state.analogBase = null; }
       refreshClockUI();
       if (tc) {
-        state.clock = { x: clamp(tc.x_hour ?? 48, 0, W0 - CLOCK_W), y: clamp(tc.y_hour ?? 20, 3, H0 - CLOCK_H) };
+        state.clock = { x: clamp(tc.x_hour ?? 48, 0, W0 - 40), y: clamp(tc.y_hour ?? 20, 3, H0 - 25) };
+        if (tc.text_id != null) { state.clockFont = tc.text_id; state.clockSize = KNOWN_FONTS[tc.text_id]?.px ?? 52; }
+        if (tc.x_spacing_h != null) state.clockSpacing = tc.x_spacing_h;
         if (tc.color_r_h != null) state.color = rgbToHex(tc.color_r_h, tc.color_g_h, tc.color_b_h);
       }
       if (tm) {
@@ -585,12 +1087,34 @@ async function bindLab() {
   }
 }
 
-// ------------------------------------------------------------------ clock style: digital / analog + hand designer
+// ------------------------------------------------------------------ clock style: digital / 10fps moving / analog + dial + hand designer
 const ANALOG_BASES = { analog_classic: 'faces/analog_classic.watch', analog_clean: 'faces/analog_color_x.watch' };
+
+function applyWatch2Layout() {
+  state.date = { ...state.date, x: 27, y: 12, visible: true };
+  state.dateShortWeek = true;
+  state.dateShortMonth = true;
+  state.clock = { x: 48, y: 218 };
+  state.clockSize = 52;
+  state.clockFont = 50;
+}
 
 async function setClockMode(mode, { keep = false } = {}) {
   if (mode === 'digital') {
-    analogTemplateBytes = null; originalSprites = null; state.analogBase = null; handCache.clear();
+    analogTemplateBytes = null; originalSprites = null; state.analogBase = null;
+    state.motion.enabled = false;
+    handCache.clear();
+  } else if (mode === 'motion') {
+    analogTemplateBytes = null; originalSprites = null; state.analogBase = null;
+    state.motion.enabled = true;
+    state.motion.mode = 'video10fps';
+    if (!state.motion.scene) state.motion.scene = 'koi_sphere';
+    if (state.motion.playing === undefined) state.motion.playing = true;
+    if (!keep && state.clock.y === 20) {
+      applyWatch2Layout();
+    }
+    bindMotionUI.show?.();
+    handCache.clear();
   } else {
     const path = ANALOG_BASES[mode];
     const r = await fetch(path);
@@ -598,22 +1122,152 @@ async function setClockMode(mode, { keep = false } = {}) {
     const bytes = new Uint8Array(await r.arrayBuffer());
     parseWatch(bytes);
     analogTemplateBytes = bytes; state.analogBase = path;
+    state.motion.enabled = false;
     loadOriginalSprites(bytes);
-    if (!keep) state.customHands = true;
+    if (!keep) {
+      state.customHands = true;
+      if (!state.dial?.style || state.dial.style === 'none') {
+        state.dial = { ...(state.dial || defaultDial()), style: 'arabic_full', scale: 1.0 };
+      }
+    }
+    bindDialUI.show?.();
+    bindHandsUI.show?.();
   }
-  refreshClockUI(); invalidate();
+  syncMotionTimer();
+  refreshClockUI();
+  invalidate();
 }
 
 function refreshClockUI() {
-  const mode = !analogTemplateBytes ? 'digital' : state.analogBase === ANALOG_BASES.analog_clean ? 'analog_clean' : state.analogBase === ANALOG_BASES.analog_classic ? 'analog_classic' : 'imported';
+  const mode = analogTemplateBytes
+    ? (state.analogBase === ANALOG_BASES.analog_clean ? 'analog_clean' : state.analogBase === ANALOG_BASES.analog_classic ? 'analog_classic' : 'imported')
+    : (state.motion?.enabled ? 'motion' : 'digital');
   $$('#clockMode button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
-  $('#handsPanel').hidden = !analogTemplateBytes;
+
+  const modeLabels = {
+    digital: '⌚ Digital',
+    motion: '🎬 10 FPS Moving',
+    analog_classic: '🕰 Analog + Date',
+    analog_clean: '🕰 Analog Clean',
+    imported: '🕰 Analog Template',
+  };
+  if ($('#activeModeBadge')) $('#activeModeBadge').textContent = modeLabels[mode] || '⌚ Digital';
+
+  // Clean mode-aware card visibility so the Design tab only shows cards for the active mode
+  if ($('#motionCard')) $('#motionCard').hidden = !state.motion?.enabled;
+  if ($('#dialCard')) $('#dialCard').hidden = !analogTemplateBytes;
+  if ($('#handsCard')) $('#handsCard').hidden = !analogTemplateBytes;
+  if ($('#clockCard')) $('#clockCard').hidden = !!analogTemplateBytes;
+  if ($('#dateCard')) $('#dateCard').hidden = !!analogTemplateBytes;
+
   $('#analogHint').textContent = analogTemplateBytes
-    ? 'Analog: the watch draws moving hands over your background. The "Clock" and "Date" cards below only apply to digital faces.'
-    : 'Digital: the watch draws the time with its built-in font. Switch to analog to design your own hands.';
+    ? 'Analog mode: customize numeric dial scales and clock hand styles below.'
+    : state.motion?.enabled
+      ? '🎬 10 FPS Moving mode: converts your GIF, MP4 video, or 10 FPS scene into hardware frame sprites with the digital clock & date on top.'
+      : 'Digital mode: drag the clock, date, or background anywhere on the watch screen.';
+
   $$('#handPresets .hand-preset').forEach(b => b.classList.toggle('on', state.customHands && b.dataset.key === state.handPreset));
+  $$('#dialPresets .hand-preset').forEach(b => b.classList.toggle('on', (state.dial?.style || 'none') === b.dataset.dkey));
   $('#handsOriginal').hidden = !analogTemplateBytes || !state.customHands;
+  if ($('#motionEnabled')) $('#motionEnabled').checked = !!state.motion?.enabled;
+  if ($('#motionPanel')) $('#motionPanel').hidden = !state.motion?.enabled;
+  $$('#videoScenePresets .hand-preset').forEach(b => b.classList.toggle('on', state.motion?.enabled && b.dataset.scene === (state.motion?.scene || 'koi_sphere')));
+  syncDialControls();
   syncHandControls();
+  syncMotionControls();
+  showSize();
+}
+
+function syncDialControls() {
+  if (!state.dial) state.dial = defaultDial();
+  const set = (sel, v, prop = 'value') => { const el = $(sel); if (el && document.activeElement !== el) el[prop] = v; };
+  set('#dialColor', state.dial.color || '#f8fafc');
+  set('#dialAccent', state.dial.accent || '#38bdf8');
+  set('#dialTrack', (state.dial.track ?? state.dial.minuteTrack) !== false, 'checked');
+  const rawSc = state.dial.scale ?? 1;
+  const scPct = Math.round(rawSc <= 3 ? rawSc * 100 : rawSc);
+  set('#dialScale', scPct);
+  if ($('#dialScaleOut')) $('#dialScaleOut').textContent = scPct + '%';
+}
+
+function bindDialUI() {
+  if (!state.dial) state.dial = defaultDial();
+  const prevDial = key => {
+    const c = Object.assign(document.createElement('canvas'), { width: 240, height: 280 });
+    const g = c.getContext('2d');
+    const bgd = g.createRadialGradient(120, 140, 10, 120, 140, 150);
+    bgd.addColorStop(0, '#1e2230');
+    bgd.addColorStop(1, '#090b10');
+    g.fillStyle = bgd;
+    g.fillRect(0, 0, 240, 280);
+    if (key !== 'none') {
+      drawDialOverlay(g, { style: key, color: '#f8fafc', accent: '#38bdf8', scale: 1.0, track: true }, 120, 140);
+    }
+    return c;
+  };
+  let drawn = false;
+  const drawPresets = () => {
+    if (drawn) return;
+    drawn = true;
+    const wrap = $('#dialPresets');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    wrap.append(...Object.entries(DIAL_STYLES).map(([key, d]) => {
+      const titleText = d.label || d.name || key;
+      const b = Object.assign(document.createElement('button'), { type: 'button', className: 'hand-preset', title: titleText });
+      b.dataset.dkey = key;
+      if (d.badge) {
+        const badge = Object.assign(document.createElement('em'), { className: 'badge-tag', textContent: d.badge });
+        b.append(badge);
+      }
+      const sp = Object.assign(document.createElement('span'), { textContent: titleText });
+      b.append(prevDial(key), sp);
+      b.onclick = () => {
+        state.dial = { ...(state.dial || defaultDial()), style: key };
+        refreshClockUI();
+        invalidate();
+        toast(`🔢 Dial Numerals: ${titleText}`);
+      };
+      return b;
+    }));
+  };
+  if ($('#dialReset')) {
+    $('#dialReset').onclick = () => {
+      state.dial = { ...(state.dial || defaultDial()), style: 'none' };
+      refreshClockUI();
+      invalidate();
+    };
+  }
+  if ($('#dialColor')) {
+    $('#dialColor').oninput = e => {
+      state.dial.color = e.target.value;
+      if (state.dial.style === 'none') state.dial.style = 'arabic_full';
+      refreshClockUI();
+      invalidate();
+    };
+  }
+  if ($('#dialAccent')) {
+    $('#dialAccent').oninput = e => {
+      state.dial.accent = e.target.value;
+      if (state.dial.style === 'none') state.dial.style = 'arabic_full';
+      refreshClockUI();
+      invalidate();
+    };
+  }
+  if ($('#dialTrack')) {
+    $('#dialTrack').onchange = e => {
+      state.dial.track = e.target.checked;
+      invalidate();
+    };
+  }
+  if ($('#dialScale')) {
+    $('#dialScale').oninput = e => {
+      state.dial.scale = (+e.target.value) / 100;
+      if ($('#dialScaleOut')) $('#dialScaleOut').textContent = e.target.value + '%';
+      invalidate();
+    };
+  }
+  bindDialUI.show = drawPresets;
 }
 
 const HAND_FIELDS = {
@@ -649,7 +1303,7 @@ function bindHandsUI() {
   const drawPresets = () => {
     if (drawn) return; drawn = true;
     $('#handPresets').append(...Object.entries(HAND_PRESETS).map(([key, d]) => {
-      const b = Object.assign(document.createElement('button'), { className: 'hand-preset', title: d.name });
+      const b = Object.assign(document.createElement('button'), { type: 'button', className: 'hand-preset', title: d.name });
       b.dataset.key = key;
       const sp = document.createElement('span'); sp.textContent = d.name;
       b.append(prev(key), sp);
@@ -691,26 +1345,300 @@ function bindHandsUI() {
   $$('#clockMode button').forEach(b => b.onclick = async () => {
     const label = b.textContent;
     $$('#clockMode button').forEach(x => x.classList.toggle('on', x === b));
-    if (b.dataset.mode !== 'digital') b.textContent = 'Loading…';
+    if (b.dataset.mode !== 'digital' && b.dataset.mode !== 'motion') b.textContent = 'Loading…';
     try {
       await setClockMode(b.dataset.mode);
-      if (b.dataset.mode !== 'digital') { drawPresets(); toast('Analog on: pick a hand design below'); $('#handsPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
-      else toast('Digital clock');
+      if (b.dataset.mode === 'motion') {
+        bindMotionUI.show?.();
+        toast('🎬 10 FPS Moving Watchface active! Playing live on the watch preview ✨');
+      } else if (b.dataset.mode !== 'digital') {
+        drawPresets();
+        bindDialUI.show?.();
+        toast('🕰 Analog mode active: pick Dial Numerals and Hand Designs below');
+      } else {
+        toast('⌚ Digital clock active');
+      }
     } catch (e) { toast('Could not switch: ' + e.message, true); refreshClockUI(); }
     finally { b.textContent = label; }
   });
   $('#handsOriginal').onclick = () => { state.customHands = false; state.handPreset = null; refreshClockUI(); invalidate(false); };
-  $('#clockFont').oninput = e => { state.clockFont = +e.target.value; invalidate(false); };
+  $('#clockFont').oninput = e => {
+    state.clockFont = +e.target.value;
+    if (KNOWN_FONTS[state.clockFont]) state.clockSize = KNOWN_FONTS[state.clockFont].px;
+    invalidate(false);
+  };
   $('#dateFont').oninput = e => { state.dateFont = +e.target.value; invalidate(false); };
   $('#dateShortWeek').onchange = e => { state.dateShortWeek = e.target.checked; invalidate(false); };
   $('#dateShortMonth').onchange = e => { state.dateShortMonth = e.target.checked; invalidate(false); };
   $('#fontPicks').append(...[50, 18, 16].map(f => {
     const b = Object.assign(document.createElement('button'), { className: 'ghost', textContent: `${f} · ${KNOWN_FONTS[f].label}` });
-    b.dataset.f = f; b.onclick = () => { state.clockFont = f; invalidate(false); };
+    b.dataset.f = f; b.onclick = () => {
+      state.clockFont = f;
+      state.clockSize = KNOWN_FONTS[f].px;
+      invalidate(false);
+    };
     return b;
   }));
-  $('#handInfo').textContent = 'Hands are drawn in 16 angles per hand (6° steps) and packed into the face. The watch turns them for the other three quarters of the dial. Faces are about 0.5 to 0.8 MB, so sending takes 1 to 2 minutes.';
+  $('#handInfo').textContent = 'Hands are drawn in 16 angles per hand (6° steps) and packed into the face. Combine with any Dial Numeral design above.';
   bindHandsUI.show = drawPresets;
+}
+
+// ------------------------------------------------------------------ Low-FPS / Low-Res Video & GIF Converter UI
+function updateConverterStats() {
+  const el = $('#converterStats');
+  if (!el || !state.motion) return;
+  const spec = resolveLowResSpec(getMotionConvertOpts());
+  const fps = clamp(state.motion.fps || 4, 1, 15);
+  const frames = clamp(state.motion.frameCount || 16, 4, 24);
+  const diam = spec.maxR * 2;
+  const rows = Math.round(diam / spec.scanlineStep);
+  const estPx = Math.round((Math.PI * spec.maxR * spec.maxR) / spec.scanlineStep);
+  const frameKb = ((3378 + rows * 12 + estPx * 2) / 1024).toFixed(1);
+  const srcLabel = state.motion.scene === 'custom_media' && customMediaName
+    ? customMediaName
+    : (VIDEO_SCENES[state.motion.scene]?.name || 'Particle Sphere');
+  el.textContent = `✔ Ready: ${srcLabel} → ${diam}×${diam} (${spec.pixelSize}×${spec.pixelSize} px block${spec.scanlineStep > 1 ? ' · Scanline' : ''}) · ${fps} FPS · ${frames} frames (~${frameKb} KB/sprite · ${rows} spans)`;
+}
+
+function syncMotionControls() {
+  if (!state.motion) return;
+  const set = (sel, v, prop = 'value') => { const el = $(sel); if (el && document.activeElement !== el) el[prop] = v; };
+  const fps = clamp(state.motion.fps || 4, 1, 15);
+  const frames = clamp(state.motion.frameCount || 16, 8, 16);
+  const resKey = state.motion.resolution && LOW_RES_PRESETS[state.motion.resolution] ? state.motion.resolution : '80x80';
+  const pxSize = clamp(+(state.motion.pixelSize || LOW_RES_PRESETS[resKey].pixelSize || 2), 1, 4);
+  set('#motionRes', resKey);
+  set('#motionPixelSize', String(pxSize));
+  set('#motionFps', fps);
+  if ($('#motionFpsOut')) $('#motionFpsOut').textContent = `${fps} FPS`;
+  $$('#fpsPicks button').forEach(b => b.classList.toggle('on', +b.dataset.fps === fps));
+  set('#motionFrames', frames);
+  if ($('#motionFramesOut')) $('#motionFramesOut').textContent = `${frames} frames`;
+  set('#motionPreviewLowRes', state.motion.previewLowRes !== false, 'checked');
+  const sc = VIDEO_SCENES[state.motion.scene] || VIDEO_SCENES.koi_sphere;
+  set('#motionAccentColor', state.motion.accentColor || sc.accent);
+  set('#motionSecondaryColor', state.motion.secondaryColor || sc.secondary);
+  if ($('#motionPlayBtn')) {
+    $('#motionPlayBtn').textContent = state.motion.playing === false ? `▶ Play (${fps} FPS)` : `⏸ Pause (${fps} FPS)`;
+  }
+  if ($('#filmstripLabel')) {
+    const spec = resolveLowResSpec(getMotionConvertOpts());
+    $('#filmstripLabel').textContent = `(${spec.preset.shortLabel} · ${spec.pixelSize}×${spec.pixelSize}px @ ${fps} FPS)`;
+  }
+  updateConverterStats();
+}
+
+function bindMotionUI() {
+  const prevScene = key => {
+    const sc = VIDEO_SCENES[key];
+    const rgba = renderSceneRgba(key, 3, 16, { accentColor: sc.accent, secondaryColor: sc.secondary });
+    const c = rgbaToCanvas(rgba);
+    const g = c.getContext('2d');
+    g.fillStyle = '#ffffff';
+    g.font = '600 13px system-ui, "Segoe UI", sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'top';
+    g.fillText('Fri Nov 06', 120, 12);
+    g.font = '700 44px system-ui, "Segoe UI", sans-serif';
+    g.fillText('20:56', 120, 218);
+    return c;
+  };
+
+  let drawn = false;
+  const drawPresets = () => {
+    if (drawn) return; drawn = true;
+    const vsGrid = $('#videoScenePresets');
+    if (vsGrid) {
+      vsGrid.innerHTML = '';
+      vsGrid.append(...Object.entries(VIDEO_SCENES).map(([key, sc]) => {
+        const b = Object.assign(document.createElement('button'), { type: 'button', className: 'hand-preset', title: `${sc.name} — ${sc.desc}` });
+        b.dataset.scene = key;
+        const badge = Object.assign(document.createElement('em'), { className: 'badge-tag', textContent: sc.badge || 'Low-Res' });
+        const sp = Object.assign(document.createElement('span'), { textContent: sc.name });
+        b.append(prevScene(key), badge, sp);
+        b.onclick = () => {
+          analogTemplateBytes = null;
+          originalSprites = null;
+          state.analogBase = null;
+          state.motion.enabled = true;
+          state.motion.mode = 'video10fps';
+          state.motion.scene = key;
+          state.motion.accentColor = sc.accent;
+          state.motion.secondaryColor = sc.secondary;
+          state.motion.playing = true;
+          motionFrameIdx = 0;
+          sceneCacheKey = '';
+          ensureSceneFrames();
+          syncMotionTimer();
+          refreshClockUI();
+          invalidate();
+          toast(`🎬 Scene: ${sc.name}`);
+        };
+        return b;
+      }));
+    }
+    ensureSceneFrames();
+    renderFilmstrip();
+  };
+
+  // Upload animated GIF / Video in Moving Watchface card
+  const mInput = $('#motionMediaInput');
+  if (mInput) mInput.onchange = e => { if (e.target.files[0]) loadAnimatedMediaFile(e.target.files[0]); e.target.value = ''; };
+  const mDrop = $('#motionDrop');
+  if (mDrop) {
+    ['dragenter', 'dragover'].forEach(t => mDrop.addEventListener(t, e => { e.preventDefault(); mDrop.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(t => mDrop.addEventListener(t, e => { e.preventDefault(); mDrop.classList.remove('over'); }));
+    mDrop.addEventListener('drop', e => { if (e.dataTransfer.files[0]) loadAnimatedMediaFile(e.dataTransfer.files[0]); });
+  }
+
+  // Play / Pause button
+  if ($('#motionPlayBtn')) {
+    $('#motionPlayBtn').onclick = () => {
+      state.motion.playing = state.motion.playing === false;
+      syncMotionTimer();
+      refreshClockUI();
+      invalidate(false);
+    };
+  }
+
+  // Match Default #2 Layout button (Fri Nov 06 at top, 20:56 at bottom)
+  if ($('#applyWatch2Layout')) {
+    $('#applyWatch2Layout').onclick = () => {
+      applyWatch2Layout();
+      state.color = '#ffffff';
+      state.date.match = true;
+      invalidate(false);
+      toast('✨ Applied Watch Default #2 layout (Date top · 20:56 bottom)');
+    };
+  }
+
+  // One-click Convert & Send to Watch button
+  if ($('#convertAndSendBtn')) {
+    $('#convertAndSendBtn').onclick = () => {
+      const spec = resolveLowResSpec(getMotionConvertOpts());
+      showTab('send');
+      if (innerWidth < 860) $('.panel')?.scrollIntoView({ behavior: 'smooth' });
+      const sendBtn = $('#sendBtn');
+      if (sendBtn && !sendBtn.disabled) {
+        toast(`⚡ Sending converted ${spec.preset.shortLabel} (${state.motion.fps || 4} FPS) face to watch…`);
+        sendBtn.click();
+      } else {
+        toast(`⚡ Converted to ${spec.preset.shortLabel} (${state.motion.fps || 4} FPS)! Click Connect → Send to watch`);
+      }
+    };
+  }
+
+  // Target Low Resolution & Pixel Block selectors
+  if ($('#motionRes')) {
+    $('#motionRes').onchange = e => {
+      const key = e.target.value;
+      state.motion.resolution = key;
+      if (LOW_RES_PRESETS[key]) {
+        state.motion.pixelSize = LOW_RES_PRESETS[key].pixelSize;
+      }
+      refreshClockUI();
+      invalidate();
+      toast(`Resolution set to ${LOW_RES_PRESETS[key]?.shortLabel || key}`);
+    };
+  }
+  if ($('#motionPixelSize')) {
+    $('#motionPixelSize').onchange = e => {
+      state.motion.pixelSize = clamp(+e.target.value || 2, 1, 4);
+      refreshClockUI();
+      invalidate();
+      toast(`Pixel block scale: ${state.motion.pixelSize}×${state.motion.pixelSize} px`);
+    };
+  }
+  if ($('#motionPreviewLowRes')) {
+    $('#motionPreviewLowRes').onchange = e => {
+      state.motion.previewLowRes = e.target.checked;
+      invalidate();
+    };
+  }
+
+  const applyNewFps = async newFps => {
+    state.motion.fps = clamp(newFps, 1, 15);
+    if ($('#motionFpsOut')) $('#motionFpsOut').textContent = `${state.motion.fps} FPS`;
+    syncMotionTimer();
+    syncMotionControls();
+    save();
+    if (state.motion.scene === 'custom_media' && lastUploadedMediaFile) {
+      await loadAnimatedMediaFile(lastUploadedMediaFile, { keepAdjustments: true });
+    } else {
+      invalidate();
+    }
+  };
+
+  // FPS slider & quick FPS buttons
+  if ($('#motionFps')) {
+    $('#motionFps').oninput = e => {
+      state.motion.fps = +e.target.value;
+      if ($('#motionFpsOut')) $('#motionFpsOut').textContent = `${state.motion.fps} FPS`;
+      syncMotionTimer();
+      syncMotionControls();
+      save();
+    };
+    $('#motionFps').onchange = e => applyNewFps(+e.target.value);
+  }
+  $$('#fpsPicks button').forEach(b => {
+    b.onclick = () => applyNewFps(+b.dataset.fps);
+  });
+
+  if ($('#motionFrames')) {
+    $('#motionFrames').oninput = e => {
+      state.motion.frameCount = +e.target.value;
+      if ($('#motionFramesOut')) $('#motionFramesOut').textContent = `${state.motion.frameCount} frames`;
+      sceneCacheKey = '';
+      ensureSceneFrames();
+      syncMotionControls();
+      invalidate();
+    };
+    $('#motionFrames').onchange = async () => {
+      if (state.motion.scene === 'custom_media' && lastUploadedMediaFile) {
+        await loadAnimatedMediaFile(lastUploadedMediaFile, { keepAdjustments: true });
+      }
+    };
+  }
+  if ($('#motionAccentColor')) {
+    $('#motionAccentColor').oninput = e => {
+      state.motion.accentColor = e.target.value;
+      sceneCacheKey = '';
+      ensureSceneFrames();
+      invalidate();
+    };
+  }
+  if ($('#motionSecondaryColor')) {
+    $('#motionSecondaryColor').oninput = e => {
+      state.motion.secondaryColor = e.target.value;
+      sceneCacheKey = '';
+      ensureSceneFrames();
+      invalidate();
+    };
+  }
+
+  $('#motionEnabled').onchange = async e => {
+    if (e.target.checked) {
+      drawPresets();
+      analogTemplateBytes = null;
+      originalSprites = null;
+      state.analogBase = null;
+      state.motion.enabled = true;
+      state.motion.mode = 'video10fps';
+      if (!state.motion.scene) state.motion.scene = 'koi_sphere';
+      state.motion.playing = true;
+      syncMotionTimer();
+      refreshClockUI();
+      invalidate();
+      toast('🎬 Low-Res Moving Watchface enabled ✨');
+    } else {
+      state.motion.enabled = false;
+      syncMotionTimer();
+      refreshClockUI();
+      invalidate();
+      toast('Moving animation off');
+    }
+  };
+  $('#motionInfo').textContent = 'Videos (.mp4, .webm, .mov) and .GIFs are downscaled into a low-resolution circular display portal (1 contiguous RGB565 span per row) with the digital clock and date rendered cleanly on top.';
+  bindMotionUI.show = drawPresets;
   refreshClockUI();
 }
 
@@ -803,14 +1731,28 @@ function bindPwa() {
   addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; $('#installBtn').hidden = false; });
   $('#installBtn').onclick = async () => { deferred?.prompt(); deferred = null; $('#installBtn').hidden = true; };
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js').then(reg => reg.update()).catch(() => {});
   }
 }
 
 // ------------------------------------------------------------------ size info
 function showSize() {
-  $('#sizeInfo').textContent = `File size: ${(212660 / 1024).toFixed(0)} KB · about 880 Bluetooth packets`;
+  const hasSprites = !!(analogTemplateBytes || state.motion?.enabled);
+  const is10fps = !analogTemplateBytes && state.motion?.enabled;
+  if (is10fps) {
+    const spec = resolveLowResSpec(getMotionConvertOpts());
+    const rows = Math.round((spec.maxR * 2) / spec.scanlineStep);
+    const estPx = Math.round((Math.PI * spec.maxR * spec.maxR) / spec.scanlineStep);
+    const frameBytes = 3378 + rows * 12 + estPx * 2;
+    const totalKb = Math.round((212660 + 33 * 3392 + 16 * frameBytes) / 1024);
+    const pkts = Math.round((totalKb * 1024) / 241);
+    $('#sizeInfo').textContent = `File size: ~${totalKb} KB (${spec.preset.shortLabel} · ${state.motion.fps || 4} FPS + digital clock) · ~${pkts} Bluetooth packets`;
+    return;
+  }
+  $('#sizeInfo').textContent = hasSprites
+    ? 'File size: ~540 KB (49 analog hand sprites) · about 2,250 Bluetooth packets'
+    : `File size: ${(212660 / 1024).toFixed(0)} KB · about 880 Bluetooth packets`;
 }
 
-bindInputs(); bindCanvas(); bindFiles(); bindBle(); bindHandsUI(); bindPwa(); showSize();
+bindInputs(); bindCanvas(); bindFiles(); bindBle(); bindDialUI(); bindHandsUI(); bindMotionUI(); bindPwa(); showSize();
 restore().then(bindLab);

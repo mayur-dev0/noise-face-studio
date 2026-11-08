@@ -9,8 +9,11 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
-  <link rel="stylesheet" href="css/style.css?v=5">
-  <script type="module" src="js/app.js?v=5"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Anton&family=Audiowide&family=Bebas+Neue&family=Black+Ops+One&family=Bungee&family=Cinzel:wght@700&family=Comfortaa:wght@700&family=Cormorant+Garamond:ital,wght@0,700;1,700&family=Dancing+Script:wght@700&family=DM+Serif+Display&family=Exo+2:wght@800&family=Great+Vibes&family=JetBrains+Mono:wght@700&family=Lobster&family=michroma&family=Monoton&family=Montserrat:wght@800&family=Orbitron:wght@700;900&family=Oswald:wght@700&family=Pacifico&family=Permanent+Marker&family=Playfair+Display:ital,wght@0,700;1,700&family=Press+Start+2P&family=Rajdhani:wght@700&family=Righteous&family=Rubik+Mono+One&family=Russo+One&family=Sacramento&family=Satisfy&family=Shadows+Into+Light&family=Share+Tech+Mono&family=Silkscreen&family=Space+Grotesk:wght@700&family=Special+Elite&family=Syncopate:wght@700&family=Teko:wght@700&family=VT323&family=Wallpoet&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=20">
+  <script type="module" src="js/app.js?v=20"></script>
 </head>
 <body>
   <header class="top">
@@ -66,74 +69,212 @@
 
       <!-- Design -->
       <div class="tab active" id="tab-design">
-        <div class="card">
-          <h2>Background</h2>
-          <label class="drop" id="drop">
-            <input type="file" id="imgInput" accept="image/*" hidden>
-            <span>📷 Drop a photo here or <u>browse</u></span>
-          </label>
-          <h3>Presets</h3>
-          <div class="presets" id="presets"></div>
-        </div>
-
-        <div class="card" id="handsCard">
-          <h2>🕰 Clock style</h2>
+        <!-- 1. Watchface Mode -->
+        <div class="card mode-card" id="modeCard">
+          <div class="card-head">
+            <h2>1. Watchface Mode</h2>
+            <span class="badge" id="activeModeBadge">⌚ Digital</span>
+          </div>
           <div class="seg" id="clockMode">
-            <button data-mode="digital" class="on">Digital</button>
-            <button data-mode="analog_classic">Analog + date</button>
-            <button data-mode="analog_clean">Analog clean</button>
+            <button data-mode="digital" class="on">⌚ Digital</button>
+            <button data-mode="motion">🎬 10 FPS Moving</button>
+            <button data-mode="analog_classic">🕰 Analog + Date</button>
+            <button data-mode="analog_clean">🕰 Analog Clean</button>
           </div>
           <p class="muted" id="analogHint"></p>
-          <div id="handsPanel" hidden>
-            <h3>Hand designs <span class="muted small">(made here, encoded in the watch's own format)</span></h3>
+        </div>
+
+        <!-- 2. Background & Watchfaces -->
+        <div class="card" id="bgCard">
+          <div class="card-head">
+            <h2>2. Background &amp; Watchfaces <span class="muted small">(photo, GIF, video, or 26 presets)</span></h2>
+            <div class="head-links">
+              <button type="button" class="link" id="centerBg" title="Centre photo/GIF crop">↔ Centre Crop</button>
+              <button type="button" class="link" id="resetAdjust" title="Reset zoom and colour adjustments">↺ Reset</button>
+            </div>
+          </div>
+          <label class="drop" id="drop">
+            <input type="file" id="imgInput" accept="image/*,video/*,.gif,.mp4,.webm,.mov" hidden>
+            <span>📷 Drop a <b>photo, animated .GIF, or .MP4 video</b> here or <u>browse</u></span>
+          </label>
+          <div class="cat-pills" id="presetCats"></div>
+          <div class="presets" id="presets"></div>
+          <details class="sub-details">
+            <summary>🎛 Crop, Zoom &amp; Colour Adjustments</summary>
+            <div class="sliders" style="margin-top:10px">
+              <label>Zoom <input type="range" data-key="zoom" min="1" max="4" step="0.01"><output></output></label>
+              <label>Brightness <input type="range" data-key="bright" min="40" max="160" step="1"><output></output></label>
+              <label>Saturation <input type="range" data-key="sat" min="0" max="200" step="1"><output></output></label>
+              <label>Blur <input type="range" data-key="blur" min="0" max="10" step="0.5"><output></output></label>
+              <label>Darken <input type="range" data-key="dim" min="0" max="0.8" step="0.01"><output></output></label>
+            </div>
+          </details>
+        </div>
+
+        <!-- 3. Video / GIF Low-FPS & Low-Resolution Converter (shown in Moving mode) -->
+        <div class="card" id="motionCard" hidden>
+          <div class="card-head">
+            <h2>🎬 Video &amp; GIF Low-FPS / Low-Res Converter <span class="muted small">(+ Digital Clock)</span></h2>
+            <label class="check"><input type="checkbox" id="motionEnabled"> Enable Moving</label>
+          </div>
+          <p class="muted" id="motionHint">Upload any video (.MP4, .WebM, .MOV) or animated .GIF — automatically converts frames to low resolution &amp; low FPS so they transfer cleanly and animate on the watch.</p>
+          <div id="motionPanel" hidden>
+            <div id="video10fpsBox">
+              <label class="drop" id="motionDrop" style="margin-bottom:10px;padding:12px">
+                <input type="file" id="motionMediaInput" accept="image/gif,video/*,image/*,.gif,.mp4,.webm,.mov" hidden>
+                <span>🎞️ <b>Upload Any Video (.MP4 / .WebM / .MOV) or .GIF</b> — auto-converts to low-res &amp; low-FPS</span>
+              </label>
+
+              <div class="row" style="justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">
+                <button type="button" id="motionPlayBtn" class="ghost">⏸ Pause</button>
+                <button type="button" id="applyWatch2Layout" class="ghost" title="Put Date at top (Fri Nov 06) and Digital Clock at bottom (20:56) like Watch Default #2">✨ Match Default #2 Layout</button>
+                <button type="button" id="convertAndSendBtn" class="accent" title="Convert current video/GIF to low-res watch sprites and open Send tab">⚡ Convert &amp; Send to Watch</button>
+              </div>
+
+              <div class="row">
+                <label class="grow">Conversion Mode
+                  <select id="motionRes">
+                    <option value="64x64">Full Area · 2×2 Low-Res Fast (~450 KB)</option>
+                    <option value="80x80" selected>Full Area · 1×1 Crisp Smooth (Recommended)</option>
+                    <option value="96x96">Full Area · High Detail (~620 KB)</option>
+                    <option value="128x128_scan">Full Area · 2×2 Scanline (For Dense Videos)</option>
+                    <option value="148x148_scan">Full Area · 3×3 Retro Block (For Any MP4/GIF)</option>
+                  </select>
+                </label>
+                <label>Pixel Scale
+                  <select id="motionPixelSize">
+                    <option value="1" selected>1×1 px (Crisp)</option>
+                    <option value="2">2×2 px (Low-Res)</option>
+                    <option value="3">3×3 px (Retro)</option>
+                    <option value="4">4×4 px (Mosaic)</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="row">
+                <label class="grow">Target FPS <input type="range" id="motionFps" min="1" max="10" step="1" value="4"></label>
+                <output id="motionFpsOut" class="pill">4 FPS</output>
+              </div>
+              <div class="cat-pills" id="fpsPicks" style="margin-bottom:8px">
+                <button type="button" data-fps="1" title="Exact 1 Hz watch hardware speed">1 FPS (Watch Exact)</button>
+                <button type="button" data-fps="2">2 FPS</button>
+                <button type="button" data-fps="4" class="on">4 FPS (Low-FPS)</button>
+                <button type="button" data-fps="6">6 FPS</button>
+                <button type="button" data-fps="10">10 FPS</button>
+              </div>
+
+              <div class="row">
+                <label class="grow">Converted frames <input type="range" id="motionFrames" min="8" max="16" step="2" value="16"></label>
+                <output id="motionFramesOut" class="pill">16 frames</output>
+              </div>
+
+              <div class="row" id="sceneColorRow" style="justify-content:space-between">
+                <label class="check"><input type="checkbox" id="motionPreviewLowRes" checked> Preview exact converted low-res on watch</label>
+                <div style="display:flex;gap:10px">
+                  <label class="check">Primary <input type="color" id="motionAccentColor" value="#38bdf8"></label>
+                  <label class="check">Accent <input type="color" id="motionSecondaryColor" value="#e0f2fe"></label>
+                </div>
+              </div>
+
+              <p class="muted small" id="converterStats" style="margin:6px 0 10px;color:#38bdf8;font-weight:600"></p>
+
+              <h3>Built-in Animated Scenes <span class="muted small">(includes Watch Default #2)</span></h3>
+              <div class="hand-presets" id="videoScenePresets"></div>
+
+              <h3>Converted Low-Res Frame Filmstrip <span class="muted small" id="filmstripLabel">(16 hardware sprites)</span></h3>
+              <div class="filmstrip" id="motionFilmstrip"></div>
+            </div>
+
+            <p class="muted" id="motionInfo"></p>
+          </div>
+        </div>
+
+        <!-- 4. Numeric & Dial Scale Designs (separate section for Analog mode) -->
+        <div class="card" id="dialCard" hidden>
+          <div class="card-head">
+            <h2>🔢 Numeric &amp; Dial Scale Designs <span class="muted small">(separate from hands)</span></h2>
+            <button type="button" class="link" id="dialReset">Clean (None)</button>
+          </div>
+          <p class="muted">Mix and match any numeral dial or chapter ring with any clock hand design below.</p>
+          <div class="hand-presets" id="dialPresets"></div>
+          <div class="row" style="margin-top:12px">
+            <label class="check">Numerals <input type="color" id="dialColor" value="#f8fafc"></label>
+            <label class="check">12 / Accent <input type="color" id="dialAccent" value="#38bdf8"></label>
+            <label class="check"><input type="checkbox" id="dialTrack" checked> 60-min outer track</label>
+          </div>
+          <div class="row">
+            <label class="grow">Dial scale <input type="range" id="dialScale" min="80" max="112" step="1" value="100"></label>
+            <output id="dialScaleOut" class="pill">100%</output>
+          </div>
+        </div>
+
+        <!-- 5. Clock Hands Designs (separate section for Analog mode) -->
+        <div class="card" id="handsCard" hidden>
+          <div class="card-head">
+            <h2>🕰 Clock Hands Designs <span class="muted small">(16 styles · hardware encoded)</span></h2>
+            <button type="button" id="handsOriginal" class="link">↺ Stock Hands</button>
+          </div>
+          <div id="handsPanel">
             <div class="hand-presets" id="handPresets"></div>
-            <h3>Fine-tune</h3>
-            <div id="handCtl" class="hand-ctl"></div>
-            <div class="row"><button id="handsOriginal" class="ghost">↺ Use the face's original hands</button></div>
+            <details class="sub-details">
+              <summary>🛠 Fine-tune individual hands (length, width, colours &amp; cap)</summary>
+              <div id="handCtl" class="hand-ctl" style="margin-top:10px"></div>
+            </details>
             <p class="muted" id="handInfo"></p>
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-head"><h2>Adjust photo</h2><button class="link" id="resetAdjust">Reset</button></div>
-          <div class="sliders">
-            <label>Zoom <input type="range" data-key="zoom" min="1" max="4" step="0.01"><output></output></label>
-            <label>Brightness <input type="range" data-key="bright" min="40" max="160" step="1"><output></output></label>
-            <label>Saturation <input type="range" data-key="sat" min="0" max="200" step="1"><output></output></label>
-            <label>Blur <input type="range" data-key="blur" min="0" max="10" step="0.5"><output></output></label>
-            <label>Darken <input type="range" data-key="dim" min="0" max="0.8" step="0.01"><output></output></label>
+        <!-- 6. Digital Clock (shown in Digital & 10 FPS Moving modes) -->
+        <div class="card" id="clockCard">
+          <div class="card-head">
+            <h2>⌚ Digital Clock</h2>
+            <div class="head-links">
+              <button type="button" class="link" id="centerClock" title="Centre clock horizontally">↔ Centre</button>
+              <button type="button" class="link" id="centerClockHV" title="Centre clock in the middle of the screen">⊕ Screen Centre</button>
+            </div>
           </div>
-        </div>
-
-        <div class="card">
-          <div class="card-head"><h2>Clock</h2><button class="link" id="centerClock">Center</button></div>
           <div class="row">
             <input type="color" id="clockColor" aria-label="Clock colour">
             <div class="swatches" id="swatches"></div>
           </div>
           <div class="row">
-            <label class="grow">Watch font <input type="range" id="clockFont" min="1" max="60" step="1"></label>
-            <output id="clockFontOut" class="pill"></output>
+            <label class="grow">Font style <select id="clockFontStyle"></select></label>
+            <label class="ghost btn-file" title="Upload .ttf, .otf, or .woff2 font">📂 Custom TTF<input type="file" id="clockFontFile" accept=".ttf,.otf,.woff,.woff2" hidden></label>
           </div>
-          <div class="row wrap" id="fontPicks"></div>
-          <p class="muted" id="fontNote"></p>
+          <div class="row">
+            <label class="grow">Clock size <input type="range" id="clockSize" min="20" max="96" step="1"></label>
+            <output id="clockSizeOut" class="pill">52px</output>
+          </div>
           <div class="row nums">
-            <label>X <input type="number" id="clockX" min="0" max="101"></label>
-            <label>Y <input type="number" id="clockY" min="3" max="230"></label>
+            <label>X <input type="number" id="clockX" min="0" max="225"></label>
+            <label>Y <input type="number" id="clockY" min="0" max="260"></label>
+            <label>Spacing <input type="number" id="clockSpacing" min="0" max="30"></label>
           </div>
-          <p class="muted">The watch draws the digits with its own built-in font. You choose the position and colour.</p>
+          <details class="sub-details">
+            <summary>⚙️ Advanced: Firmware Watch Font ID</summary>
+            <div class="row" style="margin-top:8px">
+              <label class="grow">Watch font ID <input type="range" id="clockFont" min="1" max="60" step="1"></label>
+              <output id="clockFontOut" class="pill"></output>
+            </div>
+            <div class="row wrap" id="fontPicks"></div>
+            <p class="muted" id="fontNote"></p>
+          </details>
         </div>
 
-        <div class="card">
-          <h2>Date</h2>
+        <!-- 7. Date (shown in Digital & 10 FPS Moving modes) -->
+        <div class="card" id="dateCard">
+          <div class="card-head">
+            <h2>📅 Date</h2>
+            <button type="button" class="link" id="centerDate" title="Centre date horizontally">↔ Centre</button>
+          </div>
           <div class="row">
             <label class="check"><input type="checkbox" id="dateVisible"> Show date</label>
             <label class="check"><input type="checkbox" id="dateMatch"> Same colour as clock</label>
             <input type="color" id="dateColor" aria-label="Date colour">
           </div>
           <div class="row nums">
-            <label>X <input type="number" id="dateX" min="0" max="54"></label>
-            <label>Y <input type="number" id="dateY" min="0" max="260"></label>
+            <label>X <input type="number" id="dateX" min="0" max="220"></label>
+            <label>Y <input type="number" id="dateY" min="0" max="265"></label>
           </div>
           <div class="row">
             <label class="check"><input type="checkbox" id="dateShortWeek"> Short weekday (Fri)</label>
@@ -145,20 +286,26 @@
           </div>
         </div>
 
-        <div class="card">
-          <h2>Your text <span class="muted small">(baked into the background)</span></h2>
+        <!-- 8. Your Text -->
+        <div class="card" id="labelCard">
+          <div class="card-head">
+            <h2>✍️ Your Text <span class="muted small">(baked into background)</span></h2>
+            <button type="button" class="link" id="centerLabel" title="Centre text horizontally">↔ Centre</button>
+          </div>
           <input type="text" id="labelText" placeholder="e.g. your name, a quote, an emoji ✨" maxlength="40">
           <div class="row">
-            <select id="labelFont">
-              <option value="system-ui">Clean</option>
-              <option value="Georgia, serif">Serif</option>
-              <option value="'Courier New', monospace">Mono</option>
-              <option value="Impact, 'Arial Black', sans-serif">Bold</option>
-              <option value="'Brush Script MT', 'Segoe Script', cursive">Script</option>
-            </select>
+            <select id="labelFont" class="grow"></select>
+            <label class="ghost btn-file" title="Upload .ttf, .otf, or .woff2 font">📂 Custom TTF<input type="file" id="labelFontFile" accept=".ttf,.otf,.woff,.woff2" hidden></label>
             <input type="color" id="labelColor" aria-label="Text colour">
-            <label class="grow">Size <input type="range" id="labelSize" min="10" max="60" step="1"></label>
           </div>
+          <div class="row">
+            <label class="grow">Text size <input type="range" id="labelSize" min="10" max="80" step="1"></label>
+            <output id="labelSizeOut" class="pill">22px</output>
+          </div>
+          <details class="sub-details">
+            <summary>🔤 Browse all 40+ font style previews</summary>
+            <div class="font-grid" id="labelFontGrid"></div>
+          </details>
         </div>
       </div>
 
