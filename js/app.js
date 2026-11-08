@@ -1061,8 +1061,8 @@ function renderFacesGrid(list, filter = '') {
           document.querySelectorAll('.presets .preset.on').forEach(el => el.classList.remove('on'));
           card.classList.add('on');
           if (item.kind === 'pulse3') {
-            if (!window.__installPulse3) throw new Error('Open the Send tab first');
-            await window.__installPulse3(new Uint8Array(buf), item.faceId, item.name);
+            if (!window.__sendFaceAny) throw new Error('Open the Send tab first');
+            await window.__sendFaceAny(new Uint8Array(buf), item);
             return;
           }
           await importWatch(new Uint8Array(buf), item.file);
@@ -1086,7 +1086,7 @@ async function drawFaceThumb(item, cv) {
     ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
     ctx.font = 'bold 30px system-ui'; ctx.fillText('⌚', w / 2, h * 0.42);
-    ctx.font = 'bold 13px system-ui'; ctx.fillText('PULSE 3', w / 2, h * 0.6);
+    ctx.font = 'bold 13px system-ui'; ctx.fillText('NOISEFIT FACE', w / 2, h * 0.6);
     ctx.font = '11px system-ui'; ctx.fillStyle = '#a5f3fc'; ctx.fillText('tap to install', w / 2, h * 0.72);
     return;
   }
@@ -1802,6 +1802,25 @@ function bindBle() {
       toast('Transfer failed: ' + e.message, true);
       if (!$('#minimal').checked) log('Tip: retry once. If it keeps failing at the same step, enable "Log every Bluetooth packet" and keep the log.');
     } finally { busy = false; refresh(); wake?.release?.(); }
+  };
+
+  // ---- One entry point for every saved face: picks the right protocol for whatever watch is connected.
+  window.__sendFaceAny = async (bytes, item) => {
+    const fmt = item.kind === 'pulse3' ? 'pulse3' : 'watch';
+    if (!link?.connected) { toast('Connect a watch in the Send tab first', true); return showTab('send'); }
+    const watch = link.p3 ? 'pulse3' : link.family?.faces ? 'watch' : 'none';
+    if (watch === 'none') { toast(`${link.name}: face upload for this watch model is not decoded yet`, true); return; }
+    if (fmt !== watch) {
+      toast(`This face is in ${fmt === 'pulse3' ? 'Pulse 3' : 'Pulse 2'} format and ${link.name} needs ${watch === 'pulse3' ? 'Pulse 3' : 'Pulse 2'} format. Converting between them needs the Pulse 3 image codec, which is not decoded yet.`, true);
+      return;
+    }
+    if (watch === 'pulse3') return window.__installPulse3(bytes, item.faceId, item.name);
+    showTab('send'); busy = true; refresh(); setProg(0);
+    try {
+      await transfer(link, bytes, { id: state.faceId, minimal: $('#minimal').checked, onProgress: setProg, log });
+      setProg(1); toast('Face installed ✨');
+    } catch (e) { log('Failed: ' + e.message); toast('Transfer failed: ' + e.message, true); }
+    finally { busy = false; refresh(); }
   };
 
   // ---- ColorFit Pulse 3 native faces (called from the Saved Faces tab)
