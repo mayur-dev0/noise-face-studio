@@ -1040,20 +1040,17 @@ function renderFacesGrid(list, filter = '') {
   for (const containerId of ['savedFacesLibraryGrid', 'savedFacesList']) {
     const container = $(`#${containerId}`);
     if (!container) continue;
+    container.className = 'presets';
+    container.style.cssText = 'max-height:560px; overflow-y:auto; padding:4px; margin-top:12px;';
     container.innerHTML = '';
     for (const item of filtered) {
-      const card = document.createElement('div');
-      card.className = 'face-card';
-      card.style.cssText = 'background:#18181b; border:1px solid #27272a; border-radius:8px; padding:10px; cursor:pointer; text-align:center; transition:border-color 0.15s; font-size:12px; display:flex; flex-direction:column; justify-content:space-between; min-height:85px;';
-      card.onmouseenter = () => card.style.borderColor = '#38bdf8';
-      card.onmouseleave = () => card.style.borderColor = '#27272a';
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'preset';
+      card.title = `${item.name} · ${(item.size / 1024).toFixed(0)} KB — click to open`;
       card.innerHTML = `
-        <div>
-          <canvas class="face-thumb" width="120" height="140" style="width:100%; aspect-ratio:240/280; border-radius:10px; background:#000; display:block; margin-bottom:6px;"></canvas>
-          <div style="font-weight:600; color:#f4f4f5; margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${item.name}">${item.name}</div>
-          <div style="color:#71717a; font-size:11px; margin-bottom:8px;">${(item.size / 1024).toFixed(0)} KB</div>
-        </div>
-        <button type="button" class="primary" style="padding:6px 8px; font-size:11px; width:100%; border-radius:4px;">Open &amp; Flash</button>
+        <canvas class="face-thumb" width="120" height="140" style="width:100%; height:100%; display:block;"></canvas>
+        <span>${item.name}</span>
       `;
       card.onclick = async () => {
         try {
@@ -1061,6 +1058,8 @@ function renderFacesGrid(list, filter = '') {
           const r = await fetch(`faces/${item.file}`);
           if (!r.ok) throw new Error('Could not download face file');
           const buf = await r.arrayBuffer();
+          document.querySelectorAll('.presets .preset.on').forEach(el => el.classList.remove('on'));
+          card.classList.add('on');
           await importWatch(new Uint8Array(buf), item.file);
           showTab('design');
         } catch (e) {
