@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Web app to design custom watch faces for Noise smartwatches and install them over Web Bluetooth.",
   "scripts": {
-    "test": "node tests/format.test.mjs && node tests/transfer.test.mjs && node tests/notify.test.mjs && node tests/sprite.test.mjs && node tests/hands.test.mjs && node tests/analog.test.mjs && node tests/pulse3.test.mjs",
+    "test": "node tests/format.test.mjs && node tests/transfer.test.mjs && node tests/notify.test.mjs && node tests/sprite.test.mjs && node tests/hands.test.mjs && node tests/analog.test.mjs && node tests/pulse3.test.mjs && node tests/pulse3face.test.mjs",
     "serve": "npx --yes http-server -p 8080 -c-1 ."
   },
   "license": "MIT"

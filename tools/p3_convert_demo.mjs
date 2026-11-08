@@ -1,0 +1,13 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+import { parseWatch, decode565be } from '../js/format.js';
+import { encodePulse3Face, decodePulse3Face, composePreview } from '../js/pulse3face.js';
+const w = parseWatch(new Uint8Array(readFileSync(new URL('../faces/Spidey.watch', import.meta.url))));
+const img = w.images.find(i => i.w === 240 && i.h === 280);
+const rgba = decode565be(img.data, img.w, img.h);
+const out = encodePulse3Face(new Uint8Array(readFileSync(new URL('../faces/pulse3/face_659.bin', import.meta.url))), rgba, 240, 280);
+const d = decodePulse3Face(out);
+const bg = d.images.find(i => i.kind === 'tail' && i.id === 2);
+const comp = composePreview(d.raw, d.layout, bg.rgba, { thumb: false });
+const ppm = Buffer.concat([Buffer.from(`P6 240 280 255\n`), Buffer.from(Array.from({ length: 240 * 280 }, (_, i) => [comp[4 * i], comp[4 * i + 1], comp[4 * i + 2]]).flat())]);
+writeFileSync(process.argv[2], ppm);
+console.log('pulse3 file', out.length, 'bytes');

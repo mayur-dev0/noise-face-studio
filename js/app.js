@@ -18,6 +18,44 @@ import {
   defaultMotion,
 } from './motion.js';
 import { PRESETS, PRESET_CATEGORIES } from './presets.js';
+import { decodePulse3Face, encodePulse3Face } from './pulse3face.js';
+
+// ------------------------------------------------------------------ format-neutral face helpers
+const HAND_IDS = new Set([0x42, 0x43, 0x44]);
+const P3_TEMPLATE = { file: 'faces/pulse3/face_659.bin', faceId: '659' }; // hands-only face: best base for custom backgrounds
+
+function over(dst, W, H, src, w, h, x0, y0) {
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const X = x0 + x, Y = y0 + y; if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
+    const s = 4 * (y * w + x), d = 4 * (Y * W + X), a = src[s + 3] / 255;
+    for (let c = 0; c < 3; c++) dst[d + c] = Math.round(src[s + c] * a + dst[d + c] * (1 - a));
+    dst[d + 3] = 255;
+  }
+}
+/** Any saved face (Pulse 2 .watch or Pulse 3 .bin) -> 240x280 RGBA picture. withHands adds Pulse 3 hands at 10:08. */
+function faceToRGBA(bytes, kind, { withHands = false } = {}) {
+  if (kind === 'pulse3') {
+    const f = decodePulse3Face(bytes);
+    const bgImg = f.images.find(i => i.kind === 'tail' && i.id === 2);
+    const out = new Uint8ClampedArray(bgImg.rgba);
+    for (const im of f.images) if (im.kind === 'elem' && im.frame === 0 && (withHands || !HAND_IDS.has(im.id)))
+      over(out, bgImg.w, bgImg.h, im.rgba, im.w, im.h, im.x, im.y);
+    return { rgba: out, w: bgImg.w, h: bgImg.h, decoded: f };
+  }
+  const w = parseWatch(bytes);
+  const img = w.images.find(i => i.w === W0 && i.h === H0) || w.images[0];
+  return { rgba: decode565be(img.data, img.w, img.h), w: img.w, h: img.h };
+}
+function picToCanvas({ rgba, w, h }) {
+  const c = Object.assign(document.createElement('canvas'), { width: w, height: h });
+  c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(rgba), w, h), 0, 0);
+  return c;
+}
+let p3TemplateBytes = null;
+async function pulse3Template() {
+  if (!p3TemplateBytes) { const r = await fetch(P3_TEMPLATE.file); if (!r.ok) throw new Error('Pulse 3 template missing'); p3TemplateBytes = new Uint8Array(await r.arrayBuffer()); }
+  return p3TemplateBytes;
+}
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -627,6 +665,7 @@ async function useImageFile(file) {
 }
 
 function setSource(canvas, presetId, persist) {
+  window.__originalP3 = null; // any new source replaces a loaded native Pulse 3 face
   source = canvas;
   state.presetId = presetId;
   state.zoom = 1; state.panX = 0; state.panY = 0;
@@ -1061,10 +1100,18 @@ function renderFacesGrid(list, filter = '') {
           document.querySelectorAll('.presets .preset.on').forEach(el => el.classList.remove('on'));
           card.classList.add('on');
           if (item.kind === 'pulse3') {
-            if (!window.__sendFaceAny) throw new Error('Open the Send tab first');
-            await window.__sendFaceAny(new Uint8Array(buf), item);
+            // Decode the native face into a normal picture so it can be edited and sent to ANY watch.
+            const bytes = new Uint8Array(buf);
+            const pic = faceToRGBA(bytes, 'pulse3');
+            Object.assign(state, { bright: 100, sat: 100, blur: 0, dim: 0 });
+            state.label = { ...state.label, text: '' };
+            setSource(picToCanvas(pic), null, true);
+            window.__originalP3 = { bytes, faceId: item.faceId, name: item.name };
+            invalidate(); showTab('design');
+            toast(`${item.name} loaded. Send it to any connected watch from the Send tab.`);
             return;
           }
+          window.__originalP3 = null;
           await importWatch(new Uint8Array(buf), item.file);
           showTab('design');
         } catch (e) {
@@ -1080,14 +1127,15 @@ function renderFacesGrid(list, filter = '') {
 const faceThumbCache = new Map();
 async function drawFaceThumb(item, cv) {
   if (item.kind === 'pulse3') {
-    // Native Pulse 3 files are compressed; the image codec is not decoded yet, so draw a labelled tile.
-    const ctx = cv.getContext('2d'), w = cv.width, h = cv.height;
-    const g = ctx.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#1e1b4b'); g.addColorStop(1, '#0e7490');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
-    ctx.font = 'bold 30px system-ui'; ctx.fillText('⌚', w / 2, h * 0.42);
-    ctx.font = 'bold 13px system-ui'; ctx.fillText('NOISEFIT FACE', w / 2, h * 0.6);
-    ctx.font = '11px system-ui'; ctx.fillStyle = '#a5f3fc'; ctx.fillText('tap to install', w / 2, h * 0.72);
+    try {
+      let src = faceThumbCache.get(item.file);
+      if (!src) {
+        const r = await fetch(`faces/${item.file}`); if (!r.ok) return;
+        src = picToCanvas(faceToRGBA(new Uint8Array(await r.arrayBuffer()), 'pulse3', { withHands: true }));
+        faceThumbCache.set(item.file, src);
+      }
+      const ctx = cv.getContext('2d'); ctx.imageSmoothingQuality = 'high'; ctx.drawImage(src, 0, 0, cv.width, cv.height);
+    } catch (e) { console.warn('pulse3 thumb failed', e); }
     return;
   }
   try {
@@ -1788,7 +1836,16 @@ function bindBle() {
 
   $('#sendBtn').onclick = async () => {
     if (!link?.connected) return;
-    if (link.p3) { toast('Pulse 3: install faces from the 📁 Saved Faces tab (Pulse 3 tiles).', true); return showTab('faces'); }
+    if (link.p3) {
+      const orig = window.__originalP3;
+      if (orig && confirm(`Send the original "${orig.name}" exactly as NoiseFit made it (keeps its widgets)?\n\nCancel = send the current editor design instead.`))
+        return window.__installPulse3(orig.bytes, orig.faceId, orig.name);
+      renderBg();
+      const px = bg.getContext('2d').getImageData(0, 0, W0, H0).data;
+      const out = encodePulse3Face(await pulse3Template(), px, W0, H0);
+      log(`Converted design to Pulse 3 format (${out.length} bytes, analog hands from the template).`);
+      return window.__installPulse3(out, P3_TEMPLATE.faceId, 'Custom face');
+    }
     const data = $('#sendFile').checked && fileToSend ? fileToSend : buildFile();
     busy = true; refresh(); setProg(0);
     log(`Sending ${data.length} bytes as face slot ${state.faceId}…`);
@@ -1802,25 +1859,6 @@ function bindBle() {
       toast('Transfer failed: ' + e.message, true);
       if (!$('#minimal').checked) log('Tip: retry once. If it keeps failing at the same step, enable "Log every Bluetooth packet" and keep the log.');
     } finally { busy = false; refresh(); wake?.release?.(); }
-  };
-
-  // ---- One entry point for every saved face: picks the right protocol for whatever watch is connected.
-  window.__sendFaceAny = async (bytes, item) => {
-    const fmt = item.kind === 'pulse3' ? 'pulse3' : 'watch';
-    if (!link?.connected) { toast('Connect a watch in the Send tab first', true); return showTab('send'); }
-    const watch = link.p3 ? 'pulse3' : link.family?.faces ? 'watch' : 'none';
-    if (watch === 'none') { toast(`${link.name}: face upload for this watch model is not decoded yet`, true); return; }
-    if (fmt !== watch) {
-      toast(`This face is in ${fmt === 'pulse3' ? 'Pulse 3' : 'Pulse 2'} format and ${link.name} needs ${watch === 'pulse3' ? 'Pulse 3' : 'Pulse 2'} format. Converting between them needs the Pulse 3 image codec, which is not decoded yet.`, true);
-      return;
-    }
-    if (watch === 'pulse3') return window.__installPulse3(bytes, item.faceId, item.name);
-    showTab('send'); busy = true; refresh(); setProg(0);
-    try {
-      await transfer(link, bytes, { id: state.faceId, minimal: $('#minimal').checked, onProgress: setProg, log });
-      setProg(1); toast('Face installed ✨');
-    } catch (e) { log('Failed: ' + e.message); toast('Transfer failed: ' + e.message, true); }
-    finally { busy = false; refresh(); }
   };
 
   // ---- ColorFit Pulse 3 native faces (called from the Saved Faces tab)
