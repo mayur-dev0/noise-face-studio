@@ -1026,34 +1026,39 @@ function bindFiles() {
   loadSavedFacesLibrary();
   const refBtn = $('#refreshFaces');
   if (refBtn) refBtn.onclick = () => loadSavedFacesLibrary();
+  const refMain = $('#refreshFacesMain');
+  if (refMain) refMain.onclick = () => loadSavedFacesLibrary();
+  const search = $('#faceSearchInput');
+  if (search) search.oninput = () => renderFacesGrid(allSavedFacesList, search.value);
 }
 
-async function loadSavedFacesLibrary() {
-  const container = $('#savedFacesList');
-  if (!container) return;
-  try {
-    const res = await fetch('faces/manifest.json');
-    if (!res.ok) return;
-    const list = await res.json();
-    const countBadge = $('#libraryCount');
-    if (countBadge) countBadge.textContent = `${list.length} faces`;
+let allSavedFacesList = [];
+
+function renderFacesGrid(list, filter = '') {
+  const q = filter.trim().toLowerCase();
+  const filtered = q ? list.filter(i => i.name.toLowerCase().includes(q) || i.file.toLowerCase().includes(q)) : list;
+  for (const containerId of ['savedFacesLibraryGrid', 'savedFacesList']) {
+    const container = $(`#${containerId}`);
+    if (!container) continue;
     container.innerHTML = '';
-    for (const item of list) {
+    for (const item of filtered) {
       const card = document.createElement('div');
       card.className = 'face-card';
-      card.style.cssText = 'background:#18181b; border:1px solid #27272a; border-radius:8px; padding:8px; cursor:pointer; text-align:center; transition:border-color 0.15s; font-size:12px;';
+      card.style.cssText = 'background:#18181b; border:1px solid #27272a; border-radius:8px; padding:10px; cursor:pointer; text-align:center; transition:border-color 0.15s; font-size:12px; display:flex; flex-direction:column; justify-content:space-between; min-height:85px;';
       card.onmouseenter = () => card.style.borderColor = '#38bdf8';
       card.onmouseleave = () => card.style.borderColor = '#27272a';
       card.innerHTML = `
-        <div style="font-weight:600; color:#f4f4f5; margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${item.name}">${item.name}</div>
-        <div style="color:#71717a; font-size:10px; margin-bottom:6px;">${(item.size / 1024).toFixed(0)} KB</div>
-        <button type="button" class="primary" style="padding:4px 8px; font-size:11px; width:100%; border-radius:4px;">Open</button>
+        <div>
+          <div style="font-weight:600; color:#f4f4f5; margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${item.name}">${item.name}</div>
+          <div style="color:#71717a; font-size:11px; margin-bottom:8px;">${(item.size / 1024).toFixed(0)} KB</div>
+        </div>
+        <button type="button" class="primary" style="padding:6px 8px; font-size:11px; width:100%; border-radius:4px;">Open &amp; Flash</button>
       `;
       card.onclick = async () => {
         try {
           toast(`Loading ${item.name}...`);
           const r = await fetch(`faces/${item.file}`);
-          if (!r.ok) throw new Error('Could not download face');
+          if (!r.ok) throw new Error('Could not download face file');
           const buf = await r.arrayBuffer();
           await importWatch(new Uint8Array(buf), item.file);
           showTab('design');
@@ -1063,6 +1068,20 @@ async function loadSavedFacesLibrary() {
       };
       container.appendChild(card);
     }
+  }
+}
+
+async function loadSavedFacesLibrary() {
+  try {
+    const res = await fetch('faces/manifest.json');
+    if (!res.ok) return;
+    allSavedFacesList = await res.json();
+    for (const badgeId of ['libraryCount', 'libraryCountMain']) {
+      const badge = $(`#${badgeId}`);
+      if (badge) badge.textContent = `${allSavedFacesList.length} faces`;
+    }
+    const search = $('#faceSearchInput');
+    renderFacesGrid(allSavedFacesList, search?.value || '');
   } catch (err) {
     console.warn('Failed to load faces library:', err);
   }

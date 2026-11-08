@@ -12,8 +12,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Anton&family=Audiowide&family=Bebas+Neue&family=Black+Ops+One&family=Bungee&family=Cinzel:wght@700&family=Comfortaa:wght@700&family=Cormorant+Garamond:ital,wght@0,700;1,700&family=Dancing+Script:wght@700&family=DM+Serif+Display&family=Exo+2:wght@800&family=Great+Vibes&family=JetBrains+Mono:wght@700&family=Lobster&family=michroma&family=Monoton&family=Montserrat:wght@800&family=Orbitron:wght@700;900&family=Oswald:wght@700&family=Pacifico&family=Permanent+Marker&family=Playfair+Display:ital,wght@0,700;1,700&family=Press+Start+2P&family=Rajdhani:wght@700&family=Righteous&family=Rubik+Mono+One&family=Russo+One&family=Sacramento&family=Satisfy&family=Shadows+Into+Light&family=Share+Tech+Mono&family=Silkscreen&family=Space+Grotesk:wght@700&family=Special+Elite&family=Syncopate:wght@700&family=Teko:wght@700&family=VT323&family=Wallpoet&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20">
-  <script type="module" src="js/app.js?v=20"></script>
+  <link rel="stylesheet" href="css/style.css?v=21">
+  <script type="module" src="js/app.js?v=21"></script>
 </head>
 <body>
   <header class="top">
@@ -61,6 +61,7 @@
     <section class="panel">
       <nav class="tabs" role="tablist">
         <button data-tab="design" class="active" role="tab">Design</button>
+        <button data-tab="faces" role="tab">📁 Saved Faces</button>
         <button data-tab="send" role="tab">Send</button>
         <button data-tab="notify" role="tab">💬 Notify</button>
         <button data-tab="files" role="tab">Files</button>
@@ -306,6 +307,21 @@
             <summary>🔤 Browse all 40+ font style previews</summary>
             <div class="font-grid" id="labelFontGrid"></div>
           </details>
+        </div>
+      </div>
+
+      <!-- Saved Faces (Noise Lab Library) -->
+      <div class="tab" id="tab-faces">
+        <div class="card">
+          <div class="card-head">
+            <h2>Saved Noise Watchfaces <span class="badge" id="libraryCountMain">46 faces</span></h2>
+            <button type="button" class="link" id="refreshFacesMain">↺ Refresh</button>
+          </div>
+          <p class="muted">All your uploaded and extracted watchfaces from Noise Lab (including original stock, Spidey, Hacked, Prompt Pack &amp; Aesthetics). Click any face to immediately open it in the editor and send it to your watch!</p>
+          <div class="row" style="margin-top:12px; margin-bottom:8px;">
+            <input type="text" id="faceSearchInput" placeholder="🔍 Search saved faces..." class="grow" style="padding:8px 12px; border-radius:6px; background:#18181b; border:1px solid #27272a; color:#fff;">
+          </div>
+          <div id="savedFacesLibraryGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:12px; margin-top:12px; max-height:480px; overflow-y:auto; padding:4px;"></div>
         </div>
       </div>
 
