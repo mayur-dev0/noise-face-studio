@@ -54,8 +54,20 @@ export class NoiseLink {
   ];
 
   async connect({ namePrefix = '' } = {}) {
-    const optionalServices = [0x0af0, 0x2760, 0xaa00, 0xaa01, 0x180a, 0x180f,
-      '16186f00-0000-1000-8000-00807f9b34fb', '16186f01-0000-1000-8000-00807f9b34fb'];
+    // Every watch service UUID referenced inside NoiseFit 5.5.0 (extracted from the APK), so any NoiseFit watch can be opened.
+    const B = n => `0000${n}-0000-1000-8000-00805f9b34fb`;
+    const V = n => `0000${n}-3c17-d293-8e48-14fe2e4da212`;
+    const optionalServices = [
+      ...['0af0', '2760', '27f0', 'aa01', 'aa02', 'aa03', 'aa04', 'aa05', 'ab02', 'fe78', 'fe59', 'fd50',
+        'ff01', 'ff02', 'ff03', 'ff04', 'ff05', 'ffb1', 'ffb2', 'ffd1', 'ffd2', 'ffd3', 'ffd4', 'ffd5', 'ffd8',
+        'fff1', 'fff2', 'fff3', 'fff6', 'ffff', '6666', '6006', '7006', '8001', '2001', '1601', '1701',
+        '3802', '3d01', '3e01', '4a02', '180a', '180d', '180f'].map(B),
+      ...['01ff', '02fd', '6287', '6387', '6487', '6587', '9966', 'aa55', 'd0ff'].map(V),
+      '16186f00-0000-1000-8000-00807f9b34fb', '16186f01-0000-1000-8000-00807f9b34fb',
+      '6e400001-b5a3-f393-e0a9-e50e24dcca9e', '6e400001-b5a3-f393-e0a9-e50e25dcca8d',
+      '00010203-0405-0607-0809-0a0b0c0d1912', 'fe010000-1234-5678-abcd-00805f9b34fb',
+      'a6ed0402-d344-460a-8075-b9e8ec90d71b',
+    ];
     const opts = { optionalServices };
     if (namePrefix) opts.filters = [{ namePrefix }]; else opts.acceptAllDevices = true;
     this.device = await navigator.bluetooth.requestDevice(opts);
@@ -85,9 +97,11 @@ export class NoiseLink {
     }
     this.family = NoiseLink.FAMILIES.find(f => f.need.every(k => this.chars[k])) || null;
     const svcList = services.map(s => s.uuid.length > 8 && !s.uuid.endsWith('-0000-1000-8000-00805f9b34fb') ? s.uuid : short(s.uuid)).join(', ');
+    const generic = services.filter(s => !['1800', '1801', '180a', '180f', '180d'].includes(short(s.uuid)));
+    if (!this.family && generic.length) this.family = { id: 'generic', label: 'Other NoiseFit watch', faces: false, need: [] };
     if (!this.family) {
       this.disconnect();
-      throw new Error(`Unrecognised device. Services: ${svcList || 'none'}. Pick your Noise watch, not another device.`);
+      throw new Error(`No NoiseFit watch services found. Services: ${svcList || 'none'}. Pick your Noise watch, not another device.`);
     }
     this.log(`Connected to ${this.name} · ${this.family.label}. Services: ${svcList}`);
     if (!this.family.faces) this.log('⚠ This watch uses a newer NoiseFit protocol. Connection works, but custom face upload is not decoded yet: install one face from NoiseFit with Bluetooth HCI logging on so the transfer can be captured.');
