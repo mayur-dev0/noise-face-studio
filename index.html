@@ -390,6 +390,14 @@
       <!-- Files -->
       <div class="tab" id="tab-files">
         <div class="card">
+          <div class="card-head">
+            <h2>Saved Noise Watchfaces <span class="badge" id="libraryCount">46 faces</span></h2>
+            <button type="button" class="link" id="refreshFaces">↺ Refresh</button>
+          </div>
+          <p class="muted">All your extracted and saved watchfaces from Noise Lab. Click any face to load it directly into the editor and flash it to your watch!</p>
+          <div id="savedFacesList" class="face-library-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:10px; margin-top:12px; max-height:260px; overflow-y:auto; padding:4px;"></div>
+        </div>
+        <div class="card">
           <h2>Open a .watch file</h2>
           <p>Load a face made here, or a NoiseFit cloud face you pulled from your phone. Its background, clock position and colours go into the editor.</p>
           <label class="drop small-drop"><input type="file" id="watchInput" accept=".watch,.bin" hidden><span>📂 Choose .watch file</span></label>
