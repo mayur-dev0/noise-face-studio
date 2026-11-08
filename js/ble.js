@@ -46,38 +46,54 @@ export class NoiseLink {
   get connected() { return !!this.device?.gatt?.connected; }
   get name() { return this.device?.name || 'watch'; }
 
+  // Known NoiseFit watch families. Add a new entry here when a new watch protocol is captured.
+  static FAMILIES = [
+    { id: 'pulse2', label: 'ColorFit Pulse 2 family (0AF0)', faces: true, need: ['0af1', '0af6', '0af7'] },
+    { id: 'proto16186', label: 'Newer NoiseFit watch (16186F protobuf)', faces: false,
+      need: ['16186f01-0000-1000-8000-00807f9b34fb', '16186f02-0000-1000-8000-00807f9b34fb'] },
+  ];
+
   async connect({ namePrefix = '' } = {}) {
-    const opts = { optionalServices: [0x0af0, 0x2760] };
+    const optionalServices = [0x0af0, 0x2760, 0xaa00, 0xaa01, 0x180a, 0x180f,
+      '16186f00-0000-1000-8000-00807f9b34fb', '16186f01-0000-1000-8000-00807f9b34fb'];
+    const opts = { optionalServices };
     if (namePrefix) opts.filters = [{ namePrefix }]; else opts.acceptAllDevices = true;
     this.device = await navigator.bluetooth.requestDevice(opts);
     this.device.addEventListener('gattserverdisconnected', () => { this.log('Disconnected.'); this.onDisconnect?.(); });
     this.log(`Connecting to ${this.name}…`);
     const server = await this.device.gatt.connect();
     let services = [];
-    try { services = await server.getPrimaryServices(); } catch (e) { throw new Error('No Noise services found on this device (' + e.message + ')'); }
+    try { services = await server.getPrimaryServices(); } catch (e) { throw new Error('No NoiseFit services found on this device (' + e.message + ')'); }
     this.chars = {};
     for (const s of services) {
-      for (const c of await s.getCharacteristics()) {
+      let cs = [];
+      try { cs = await s.getCharacteristics(); } catch { continue; }
+      for (const c of cs) {
         const id = short(c.uuid);
         this.chars[id] = c;
+        this.chars[c.uuid.toLowerCase()] = c;
         if (c.properties.notify) {
-          if (id === '0af7') c.addEventListener('characteristicvaluechanged', e => {
+          c.addEventListener('characteristicvaluechanged', e => {
             const v = e.target.value;
             const b = new Uint8Array(v.buffer.slice(v.byteOffset, v.byteOffset + v.byteLength));
-            if (this.verbose) this.log('  ← ' + toHex(b));
-            this.q.push(b);
+            if (this.verbose) this.log(`  ← ${id} ` + toHex(b));
+            if (id === '0af7') this.q.push(b);
           });
           try { await c.startNotifications(); } catch (e) { this.log(`  (could not subscribe to ${id}: ${e.message})`); }
         }
       }
     }
-    const missing = ['0af1', '0af6', '0af7'].filter(k => !this.chars[k]);
-    if (missing.length) {
+    this.family = NoiseLink.FAMILIES.find(f => f.need.every(k => this.chars[k])) || null;
+    const svcList = services.map(s => s.uuid.length > 8 && !s.uuid.endsWith('-0000-1000-8000-00805f9b34fb') ? s.uuid : short(s.uuid)).join(', ');
+    if (!this.family) {
       this.disconnect();
-      throw new Error(`This device does not expose the Noise face characteristics (missing ${missing.join(', ')}). Pick your watch, not another device.`);
+      throw new Error(`Unrecognised device. Services: ${svcList || 'none'}. Pick your Noise watch, not another device.`);
     }
-    this.log(`Connected to ${this.name}. Services: ${services.map(s => short(s.uuid)).join(', ')}`);
+    this.log(`Connected to ${this.name} · ${this.family.label}. Services: ${svcList}`);
+    if (!this.family.faces) this.log('⚠ This watch uses a newer NoiseFit protocol. Connection works, but custom face upload is not decoded yet: install one face from NoiseFit with Bluetooth HCI logging on so the transfer can be captured.');
   }
+
+  get canSendFaces() { return !!this.family?.faces; }
 
   disconnect() { try { this.device?.gatt?.disconnect(); } catch { /* ignore */ } }
 
@@ -109,6 +125,7 @@ export class NoiseLink {
  * onProgress(fraction 0..1, sentBytes, totalBytes)
  */
 export async function transfer(link, data, { id = DEFAULT_ID, minimal = false, onProgress = () => {}, log = link.log } = {}) {
+  if (link.family && !link.family.faces) throw new Error(`${link.name} is connected, but face upload for "${link.family.label}" is not supported yet.`);
   if (!minimal) {
     log('Handshake (device info, time, sync)…');
     for (const [ch, p] of [...PRE_A, ...PRE_B]) { await link.write(ch, p); await link.quiet(); }
