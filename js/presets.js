@@ -31,14 +31,14 @@ function vignette(ctx, a = 0.55) {
 }
 
 export const PRESET_CATEGORIES = [
-  { id: 'all', label: 'All' },
-  { id: 'favourites', label: '💜 My Favourites (12)' },
+  { id: 'favourites', label: '💜 Favourites (12)' },
+  { id: 'all', label: '✨ All Faces' },
   { id: 'crazy', label: '🔥 Crazy & Epic' },
-  { id: 'pulse2', label: '⚡ Pulse 2 Pack (14)' },
-  { id: 'amoled', label: 'Dark AMOLED' },
-  { id: 'minimal', label: 'Minimalist & Aesthetic' },
-  { id: 'abstract', label: 'Abstract' },
-  { id: 'scenic', label: 'Sci-Fi & Nature' },
+  { id: 'pulse2', label: '⚡ Pulse 2 Pack' },
+  { id: 'amoled', label: '🌑 Dark AMOLED' },
+  { id: 'minimal', label: '◯ Minimalist' },
+  { id: 'abstract', label: '🎨 Abstract' },
+  { id: 'scenic', label: '🌌 Sci-Fi & Nature' },
 ];
 
 export const PRESETS = [

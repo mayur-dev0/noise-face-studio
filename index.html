@@ -12,16 +12,22 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Anton&family=Audiowide&family=Bebas+Neue&family=Black+Ops+One&family=Bungee&family=Cinzel:wght@700&family=Comfortaa:wght@700&family=Cormorant+Garamond:ital,wght@0,700;1,700&family=Dancing+Script:wght@700&family=DM+Serif+Display&family=Exo+2:wght@800&family=Great+Vibes&family=JetBrains+Mono:wght@700&family=Lobster&family=michroma&family=Monoton&family=Montserrat:wght@800&family=Orbitron:wght@700;900&family=Oswald:wght@700&family=Pacifico&family=Permanent+Marker&family=Playfair+Display:ital,wght@0,700;1,700&family=Press+Start+2P&family=Rajdhani:wght@700&family=Righteous&family=Rubik+Mono+One&family=Russo+One&family=Sacramento&family=Satisfy&family=Shadows+Into+Light&family=Share+Tech+Mono&family=Silkscreen&family=Space+Grotesk:wght@700&family=Special+Elite&family=Syncopate:wght@700&family=Teko:wght@700&family=VT323&family=Wallpoet&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=30">
-  <script type="module" src="js/app.js?v=30"></script>
+  <link rel="stylesheet" href="css/style.css?v=31">
+  <script type="module" src="js/app.js?v=31"></script>
 </head>
 <body>
+  <div class="ambient-orbs" aria-hidden="true">
+    <span class="orb orb-violet"></span>
+    <span class="orb orb-cyan"></span>
+    <span class="orb orb-rose"></span>
+  </div>
+
   <header class="top">
     <div class="brand">
-      <img src="icon.svg" alt="" width="36" height="36">
+      <div class="brand-logo"><img src="icon.svg" alt="" width="34" height="34"></div>
       <div>
         <h1>NoiseFace Studio</h1>
-        <p>Custom faces for Noise watches · 240×280</p>
+        <p>Minimalist Glass Watchface Designer · 240×280</p>
       </div>
     </div>
     <div class="top-actions">
@@ -34,25 +40,32 @@
   <main class="layout">
     <!-- Stage ------------------------------------------------------------ -->
     <section class="stage">
-      <div class="watch">
-        <div class="strap"></div>
-        <div class="body">
-          <div class="crown"></div>
-          <div class="screen"><canvas id="screen" width="480" height="560" aria-label="Watch face preview"></canvas></div>
+      <div class="stage-glass">
+        <div class="stage-top-bar">
+          <span class="live-dot"></span>
+          <span>Live 240×280 Preview</span>
+          <span class="badge" id="activeModeBadge">⌚ Digital</span>
         </div>
-        <div class="strap"></div>
-      </div>
-      <p class="hint">Drag the clock, date or text to move them. Drag anywhere else to move the photo. Scroll or pinch to zoom.</p>
-      <div class="stage-actions">
-        <button id="downloadBtn" class="primary">⬇ Download .watch</button>
-        <button id="gotoSend" class="accent">⌁ Send to watch</button>
-      </div>
-      <div class="thumb">
-        <canvas id="pickerPreview" width="184" height="210"></canvas>
-        <div>
-          <strong>Face-list thumbnail</strong>
-          <p>This 184×210 image goes into the file. The watch shows it in its face picker.</p>
-          <p class="muted" id="sizeInfo"></p>
+        <div class="watch">
+          <div class="strap"></div>
+          <div class="body">
+            <div class="crown"></div>
+            <div class="screen"><canvas id="screen" width="480" height="560" aria-label="Watch face preview"></canvas></div>
+          </div>
+          <div class="strap"></div>
+        </div>
+        <p class="hint">Drag clock, date, or photo directly on the watch screen · Scroll to zoom</p>
+        <div class="stage-actions">
+          <button id="gotoSend" class="accent">⚡ Send to Watch</button>
+          <button id="downloadBtn" class="primary">⬇ Download .watch</button>
+        </div>
+        <div class="thumb">
+          <canvas id="pickerPreview" width="184" height="210"></canvas>
+          <div>
+            <strong>Watch Picker Thumbnail</strong>
+            <p>184×210 preview embedded in file</p>
+            <p class="muted" id="sizeInfo"></p>
+          </div>
         </div>
       </div>
     </section>
@@ -60,37 +73,42 @@
     <!-- Panel ------------------------------------------------------------ -->
     <section class="panel">
       <nav class="tabs" role="tablist">
-        <button data-tab="design" class="active" role="tab">Design</button>
-        <button data-tab="faces" role="tab">📁 Saved Faces</button>
-        <button data-tab="send" role="tab">Send</button>
+        <button data-tab="design" class="active" role="tab">✨ Studio</button>
+        <button data-tab="faces" role="tab">💜 Watchfaces</button>
+        <button data-tab="send" role="tab">📡 Connect &amp; Send</button>
         <button data-tab="notify" role="tab">💬 Notify</button>
-        <button data-tab="files" role="tab">Files</button>
-        <button data-tab="about" role="tab">How it works</button>
+        <button data-tab="files" role="tab">🗂 Files</button>
+        <button data-tab="about" role="tab">ℹ️ Guide</button>
       </nav>
 
       <!-- Design -->
       <div class="tab active" id="tab-design">
-        <!-- 1. Watchface Mode -->
+        <!-- 1. Watchface Mode + Focused Step Switcher -->
         <div class="card mode-card" id="modeCard">
           <div class="card-head">
-            <h2>1. Watchface Mode</h2>
-            <span class="badge" id="activeModeBadge">⌚ Digital</span>
+            <h2>Clock Type</h2>
+            <p class="muted" id="analogHint" style="margin:0"></p>
           </div>
           <div class="seg" id="clockMode">
             <button data-mode="digital" class="on">⌚ Digital</button>
-            <button data-mode="motion">🎬 10 FPS Moving</button>
-            <button data-mode="analog_classic">🕰 Analog + Date</button>
             <button data-mode="analog_clean">🕰 Analog Clean</button>
+            <button data-mode="analog_classic">🕰 Analog + Date</button>
+            <button data-mode="motion">🎬 Moving Video/GIF</button>
           </div>
-          <p class="muted" id="analogHint"></p>
+          <div class="step-nav" id="designSteps" role="navigation" aria-label="Editor steps">
+            <button type="button" data-step="bg" class="on"><span>1</span> Pick Face / Photo</button>
+            <button type="button" data-step="clock" id="stepClockBtn"><span>2</span> Clock &amp; Style</button>
+            <button type="button" data-step="text"><span>3</span> Text &amp; Effects</button>
+            <button type="button" data-step="all" title="Show all editor cards at once">⊞ All</button>
+          </div>
         </div>
 
         <!-- 2. Background & Watchfaces -->
         <div class="card" id="bgCard">
           <div class="card-head">
-            <h2>2. Background &amp; Watchfaces <span class="muted small">(photo, GIF, video, or 26 presets)</span></h2>
+            <h2>Choose a Watchface or Upload Photo / GIF</h2>
             <div class="head-links">
-              <button type="button" class="link" id="centerBg" title="Centre photo/GIF crop">↔ Centre Crop</button>
+              <button type="button" class="link" id="centerBg" title="Centre photo/GIF crop">↔ Centre</button>
               <button type="button" class="link" id="resetAdjust" title="Reset zoom and colour adjustments">↺ Reset</button>
             </div>
           </div>
@@ -100,8 +118,8 @@
           </label>
           <div class="cat-pills" id="presetCats"></div>
           <div class="presets" id="presets"></div>
-          <details class="sub-details">
-            <summary>🎛 Crop, Zoom &amp; Colour Adjustments</summary>
+          <details class="sub-details" id="adjustDetails">
+            <summary>🎛 Photo Crop, Zoom &amp; Colour Adjustments</summary>
             <div class="sliders" style="margin-top:10px">
               <label>Zoom <input type="range" data-key="zoom" min="1" max="4" step="0.01"><output></output></label>
               <label>Brightness <input type="range" data-key="bright" min="40" max="160" step="1"><output></output></label>
@@ -110,6 +128,9 @@
               <label>Darken <input type="range" data-key="dim" min="0" max="0.8" step="0.01"><output></output></label>
             </div>
           </details>
+          <div class="step-footer">
+            <button type="button" class="ghost step-next-btn" data-goto-step="clock">Next: Customize Clock / Hands →</button>
+          </div>
         </div>
 
         <!-- 3. Video / GIF Low-FPS & Low-Resolution Converter (shown in Moving mode) -->
@@ -223,6 +244,9 @@
             </details>
             <p class="muted" id="handInfo"></p>
           </div>
+          <div class="step-footer">
+            <button type="button" class="ghost step-next-btn" data-goto-step="text">Next: Add Custom Text →</button>
+          </div>
         </div>
 
         <!-- 6. Digital Clock (shown in Digital & 10 FPS Moving modes) -->
@@ -232,6 +256,12 @@
             <div class="head-links">
               <button type="button" class="link" id="centerClock" title="Centre clock horizontally">↔ Centre</button>
               <button type="button" class="link" id="centerClockHV" title="Centre clock in the middle of the screen">⊕ Screen Centre</button>
+            </div>
+          </div>
+          <div class="row">
+            <div class="seg compact-seg" id="clockLayoutSeg" style="flex:1">
+              <button type="button" data-layout="horizontal" class="on">Horizontal (08:26)</button>
+              <button type="button" data-layout="stacked">Stacked (08 / 26)</button>
             </div>
           </div>
           <div class="row">
@@ -285,6 +315,9 @@
             <label class="grow">Date font <input type="range" id="dateFont" min="1" max="60" step="1"></label>
             <output id="dateFontOut" class="pill"></output>
           </div>
+          <div class="step-footer">
+            <button type="button" class="ghost step-next-btn" data-goto-step="text">Next: Add Custom Text →</button>
+          </div>
         </div>
 
         <!-- 8. Your Text -->
@@ -314,14 +347,21 @@
       <div class="tab" id="tab-faces">
         <div class="card">
           <div class="card-head">
-            <h2>Saved Noise Watchfaces <span class="badge" id="libraryCountMain">46 faces</span></h2>
+            <h2>💜 Ready-to-Flash Watchfaces <span class="badge" id="libraryCountMain">60 faces</span></h2>
             <button type="button" class="link" id="refreshFacesMain">↺ Refresh</button>
           </div>
-          <p class="muted">All your uploaded and extracted watchfaces from Noise Lab (including original stock, Spidey, Hacked, Prompt Pack &amp; Aesthetics). Click any face to immediately open it in the editor and send it to your watch!</p>
-          <div class="row" style="margin-top:12px; margin-bottom:8px;">
-            <input type="text" id="faceSearchInput" placeholder="🔍 Search saved faces..." class="grow" style="padding:8px 12px; border-radius:6px; background:#18181b; border:1px solid #27272a; color:#fff;">
+          <p class="muted">Click any watchface below to load it into the live preview — edit it or press <b>⚡ Send to Watch</b> immediately.</p>
+          <div class="row" style="margin-top:12px">
+            <input type="text" id="faceSearchInput" placeholder="🔍 Search watchfaces by name or style..." class="grow">
           </div>
-          <div id="savedFacesLibraryGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:12px; margin-top:12px; max-height:480px; overflow-y:auto; padding:4px;"></div>
+          <div class="cat-pills" id="savedFacesFilterPills">
+            <button type="button" data-fcat="all" class="on">✨ All</button>
+            <button type="button" data-fcat="fav">💜 Favourites (12)</button>
+            <button type="button" data-fcat="analog">🕰 Analog</button>
+            <button type="button" data-fcat="digital">⌚ Digital</button>
+            <button type="button" data-fcat="pulse3">⌚ Pulse 3 Native</button>
+          </div>
+          <div id="savedFacesLibraryGrid" class="presets library-grid"></div>
         </div>
       </div>
 

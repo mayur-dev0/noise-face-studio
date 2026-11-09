@@ -941,6 +941,18 @@ function syncInputs() {
     ? 'Adjust Clock size, Spacing, or Font style above, or pick a Watch font ID (50 = Large, 18 = Medium, 16 = Small).'
     : `Font ${state.clockFont} hasn't been tried yet. Send it to see what the watch does (it may be another size or style, or fall back to the default).`;
   $$('#swatches button').forEach(b => b.classList.toggle('on', b.dataset.c === state.color));
+  $$('#clockLayoutSeg button').forEach(b => b.classList.toggle('on', b.dataset.layout === (state.clockLayout || 'horizontal')));
+}
+
+let activeDesignStep = 'bg';
+function setDesignStep(step) {
+  activeDesignStep = step || 'bg';
+  $$('#designSteps button').forEach(b => b.classList.toggle('on', b.dataset.step === activeDesignStep));
+  if (activeDesignStep === 'clock' && analogTemplateBytes) {
+    bindDialUI.show?.();
+    bindHandsUI.show?.();
+  }
+  refreshClockUI();
 }
 
 function bindInputs() {
@@ -950,6 +962,19 @@ function bindInputs() {
   if ($('#centerBg')) {
     $('#centerBg').onclick = () => { state.panX = 0; state.panY = 0; invalidate(); toast('Background centred'); };
   }
+
+  $$('#designSteps button').forEach(b => {
+    b.onclick = () => setDesignStep(b.dataset.step);
+  });
+  $$('[data-goto-step]').forEach(b => {
+    b.onclick = () => setDesignStep(b.dataset.gotoStep);
+  });
+  $$('#clockLayoutSeg button').forEach(b => {
+    b.onclick = () => {
+      state.clockLayout = b.dataset.layout;
+      invalidate(false);
+    };
+  });
 
   $('#clockColor').addEventListener('input', e => { state.color = e.target.value; invalidate(false); });
   $('#clockFontStyle').onchange = e => { state.clockFontFamily = e.target.value; invalidate(false); };
@@ -1046,10 +1071,12 @@ function bindInputs() {
     }));
   }
 
+  const initCat = PRESET_CATEGORIES?.[0]?.id || 'all';
   $('#presets').append(...PRESETS.map(p => {
     const b = Object.assign(document.createElement('button'), { className: 'preset', title: p.name });
     b.dataset.id = p.id;
     b.dataset.cat = p.cat || 'scenic';
+    b.hidden = initCat !== 'all' && b.dataset.cat !== initCat;
     const img = new Image(); img.alt = ''; img.src = renderPresetCardThumb(p);
     const sp = document.createElement('span'); sp.textContent = p.name;
     b.append(img, sp);
@@ -1180,13 +1207,34 @@ function bindFiles() {
   if (refMain) refMain.onclick = () => loadSavedFacesLibrary();
   const search = $('#faceSearchInput');
   if (search) search.oninput = () => renderFacesGrid(allSavedFacesList, search.value);
+  $$('#savedFacesFilterPills button').forEach(b => {
+    b.onclick = () => {
+      activeSavedFaceCat = b.dataset.fcat || 'all';
+      $$('#savedFacesFilterPills button').forEach(x => x.classList.toggle('on', x === b));
+      renderFacesGrid(allSavedFacesList, search?.value || '');
+    };
+  });
 }
 
 let allSavedFacesList = [];
+let activeSavedFaceCat = 'all';
+const ANALOG_SAVED_IDS = new Set([
+  'analog_classic', 'analog_color_x',
+  'fav_gold_ribbon', 'fav_amber_sweep', 'fav_neon_outline', 'fav_crimson_x',
+  'fav_indigo_stripes', 'fav_obsidian_sweep', 'fav_petal_mandala', 'fav_mint_stripes',
+  'pulse3_659', 'pulse3_1504', 'pulse3_1521',
+]);
 
 function renderFacesGrid(list, filter = '') {
   const q = filter.trim().toLowerCase();
-  const filtered = q ? list.filter(i => i.name.toLowerCase().includes(q) || i.file.toLowerCase().includes(q)) : list;
+  const byCat = list.filter(i => {
+    if (activeSavedFaceCat === 'fav') return String(i.id || '').startsWith('fav_');
+    if (activeSavedFaceCat === 'pulse3') return i.kind === 'pulse3';
+    if (activeSavedFaceCat === 'analog') return ANALOG_SAVED_IDS.has(i.id) || String(i.id || '').startsWith('analog_');
+    if (activeSavedFaceCat === 'digital') return !ANALOG_SAVED_IDS.has(i.id) && !String(i.id || '').startsWith('analog_');
+    return true;
+  });
+  const filtered = q ? byCat.filter(i => i.name.toLowerCase().includes(q) || i.file.toLowerCase().includes(q)) : byCat;
   for (const containerId of ['savedFacesLibraryGrid', 'savedFacesList']) {
     const container = $(`#${containerId}`);
     if (!container) continue;
@@ -1431,18 +1479,31 @@ function refreshClockUI() {
   };
   if ($('#activeModeBadge')) $('#activeModeBadge').textContent = modeLabels[mode] || '⌚ Digital';
 
-  // Clean mode-aware card visibility so the Design tab only shows cards for the active mode
-  if ($('#motionCard')) $('#motionCard').hidden = !state.motion?.enabled;
-  if ($('#dialCard')) $('#dialCard').hidden = !analogTemplateBytes;
-  if ($('#handsCard')) $('#handsCard').hidden = !analogTemplateBytes;
-  if ($('#clockCard')) $('#clockCard').hidden = !!analogTemplateBytes;
-  if ($('#dateCard')) $('#dateCard').hidden = !!analogTemplateBytes;
+  // Clean mode-aware + step-aware card visibility so the Design tab is minimal and uncluttered
+  const showAll = activeDesignStep === 'all';
+  const showBg = showAll || activeDesignStep === 'bg';
+  const showClock = showAll || activeDesignStep === 'clock';
+  const showText = showAll || activeDesignStep === 'text';
+
+  if ($('#bgCard')) $('#bgCard').hidden = !showBg;
+  if ($('#motionCard')) $('#motionCard').hidden = !state.motion?.enabled || !showBg;
+  if ($('#dialCard')) $('#dialCard').hidden = !analogTemplateBytes || !showClock;
+  if ($('#handsCard')) $('#handsCard').hidden = !analogTemplateBytes || !showClock;
+  if ($('#clockCard')) $('#clockCard').hidden = !!analogTemplateBytes || !showClock;
+  if ($('#dateCard')) $('#dateCard').hidden = !!analogTemplateBytes || !showClock;
+  if ($('#labelCard')) $('#labelCard').hidden = !showText;
+
+  if ($('#stepClockBtn')) {
+    $('#stepClockBtn').innerHTML = analogTemplateBytes
+      ? '<span>2</span> Hands &amp; Dial'
+      : '<span>2</span> Clock &amp; Date';
+  }
 
   $('#analogHint').textContent = analogTemplateBytes
-    ? 'Analog mode: customize numeric dial scales and clock hand styles below.'
+    ? 'Analog mode · Pick a face in Step 1 or customize Hands & Dial in Step 2'
     : state.motion?.enabled
-      ? '🎬 10 FPS Moving mode: converts your GIF, MP4 video, or 10 FPS scene into hardware frame sprites with the digital clock & date on top.'
-      : 'Digital mode: drag the clock, date, or background anywhere on the watch screen.';
+      ? 'Moving Video/GIF mode · Upload video/GIF in Step 1 or style Clock in Step 2'
+      : 'Digital mode · Drag clock or date on the watch screen';
 
   $$('#handPresets .hand-preset').forEach(b => b.classList.toggle('on', state.customHands && b.dataset.key === state.handPreset));
   $$('#dialPresets .hand-preset').forEach(b => b.classList.toggle('on', (state.dial?.style || 'none') === b.dataset.dkey));
@@ -1628,11 +1689,13 @@ function bindHandsUI() {
       await setClockMode(b.dataset.mode);
       if (b.dataset.mode === 'motion') {
         bindMotionUI.show?.();
+        if (activeDesignStep !== 'all') setDesignStep('bg');
         toast('🎬 10 FPS Moving Watchface active! Playing live on the watch preview ✨');
       } else if (b.dataset.mode !== 'digital') {
         drawPresets();
         bindDialUI.show?.();
-        toast('🕰 Analog mode active: pick Dial Numerals and Hand Designs below');
+        if (activeDesignStep !== 'all') setDesignStep('clock');
+        toast('🕰 Analog mode active: customize Dial Numerals and Hand Designs');
       } else {
         toast('⌚ Digital clock active');
       }
