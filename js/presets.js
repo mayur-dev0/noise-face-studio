@@ -32,6 +32,7 @@ function vignette(ctx, a = 0.55) {
 
 export const PRESET_CATEGORIES = [
   { id: 'favourites', label: '💜 Favourites (12)' },
+  { id: 'glass', label: '💎 Glass Studio (8)' },
   { id: 'all', label: '✨ All Faces' },
   { id: 'crazy', label: '🔥 Crazy & Epic' },
   { id: 'pulse2', label: '⚡ Pulse 2 Pack' },
@@ -578,6 +579,269 @@ export const PRESETS = [
       x.fillText('06', cx, 416);
       x.font = '600 26px "Montserrat", "Segoe UI", sans-serif';
       x.fillText('AM', cx, 504);
+      return c;
+    },
+  },
+  // ---- 8 Liquid Glass & Minimalist Studio Watchfaces (4 Analog + 4 Digital) ----
+  {
+    id: 'glass_aurora_orb', name: 'Liquid Glass Orb', cat: 'glass', color: '#ffffff',
+    mode: 'analog_clean', handPreset: 'amber_hollow',
+    dial: { style: 'none' },
+    draw() {
+      const [c, x] = canvas();
+      x.fillStyle = '#050710'; x.fillRect(0, 0, W, H);
+      const cx = W / 2, cy = H / 2;
+      blob(x, cx - 75, cy - 85, 220, 'rgba(139, 92, 246, 0.72)');
+      blob(x, cx + 85, cy + 75, 230, 'rgba(6, 182, 212, 0.68)');
+      blob(x, cx + 70, cy - 90, 175, 'rgba(236, 72, 153, 0.55)');
+      // Frosted glass circular lens + specular rim
+      const gLens = x.createLinearGradient(cx - 190, cy - 190, cx + 190, cy + 190);
+      gLens.addColorStop(0, 'rgba(255,255,255,0.22)');
+      gLens.addColorStop(0.5, 'rgba(255,255,255,0.05)');
+      gLens.addColorStop(1, 'rgba(56,189,248,0.16)');
+      x.fillStyle = gLens;
+      x.beginPath(); x.arc(cx, cy, 198, 0, Math.PI * 2); x.fill();
+      const rim = x.createLinearGradient(cx - 198, cy - 198, cx + 198, cy + 198);
+      rim.addColorStop(0, 'rgba(255,255,255,0.75)');
+      rim.addColorStop(0.5, 'rgba(255,255,255,0.12)');
+      rim.addColorStop(1, 'rgba(56,189,248,0.65)');
+      x.strokeStyle = rim; x.lineWidth = 3.5;
+      x.beginPath(); x.arc(cx, cy, 198, 0, Math.PI * 2); x.stroke();
+      // 12 crisp glass hour batons
+      for (let k = 0; k < 12; k++) {
+        const a = (k * Math.PI) / 6;
+        const r0 = k % 3 === 0 ? 156 : 168;
+        const r1 = 186;
+        x.strokeStyle = k % 3 === 0 ? '#ffffff' : 'rgba(255,255,255,0.55)';
+        x.lineWidth = k % 3 === 0 ? 6 : 3;
+        x.lineCap = 'round';
+        x.beginPath();
+        x.moveTo(cx + Math.sin(a) * r0, cy - Math.cos(a) * r0);
+        x.lineTo(cx + Math.sin(a) * r1, cy - Math.cos(a) * r1);
+        x.stroke();
+      }
+      return c;
+    },
+  },
+  {
+    id: 'glass_prism_dial', name: 'Frosted Prism Dial', cat: 'glass', color: '#e2e8f0',
+    mode: 'analog_clean', handPreset: 'obsidian_hollow',
+    dial: { style: 'none' },
+    draw() {
+      const [c, x] = canvas();
+      const bg = x.createLinearGradient(0, 0, W, H);
+      bg.addColorStop(0, '#090d1a'); bg.addColorStop(0.5, '#11182d'); bg.addColorStop(1, '#060811');
+      x.fillStyle = bg; x.fillRect(0, 0, W, H);
+      blob(x, 110, 140, 220, 'rgba(56, 189, 248, 0.35)');
+      blob(x, 370, 420, 230, 'rgba(168, 85, 247, 0.35)');
+      // Overlapping frosted glass cards
+      const panes = [
+        [-22, 60, 110, 360, 340, 44],
+        [16, 65, 115, 350, 330, 44],
+      ];
+      const cx = W / 2, cy = H / 2;
+      for (const [deg, px, py, pw, ph, pr] of panes) {
+        x.save();
+        x.translate(cx, cy); x.rotate((deg * Math.PI) / 180); x.translate(-cx, -cy);
+        const pg = x.createLinearGradient(px, py, px + pw, py + ph);
+        pg.addColorStop(0, 'rgba(255,255,255,0.16)');
+        pg.addColorStop(1, 'rgba(255,255,255,0.03)');
+        x.fillStyle = pg;
+        x.strokeStyle = 'rgba(255,255,255,0.34)'; x.lineWidth = 2.5;
+        x.beginPath(); x.roundRect(px, py, pw, ph, pr); x.fill(); x.stroke();
+        x.restore();
+      }
+      x.font = '800 54px "Montserrat", "Segoe UI", sans-serif';
+      x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillStyle = 'rgba(255,255,255,0.9)';
+      x.fillText('12', cx, 92);
+      x.fillText('6', cx, H - 92);
+      x.fillText('9', 78, cy);
+      x.fillText('3', W - 78, cy);
+      return c;
+    },
+  },
+  {
+    id: 'glass_titanium_sunray', name: 'Titanium Sunburst', cat: 'glass', color: '#38bdf8',
+    mode: 'analog_clean', handPreset: 'indigo_baton',
+    dial: { style: 'none' },
+    draw() {
+      const [c, x] = canvas();
+      const cx = W / 2, cy = H / 2;
+      if (typeof x.createConicGradient === 'function') {
+        const cg = x.createConicGradient(0, cx, cy);
+        cg.addColorStop(0.00, '#0f172a');
+        cg.addColorStop(0.18, '#1e293b');
+        cg.addColorStop(0.33, '#334155');
+        cg.addColorStop(0.50, '#0f172a');
+        cg.addColorStop(0.68, '#1e293b');
+        cg.addColorStop(0.84, '#334155');
+        cg.addColorStop(1.00, '#0f172a');
+        x.fillStyle = cg; x.fillRect(0, 0, W, H);
+      } else {
+        x.fillStyle = '#162032'; x.fillRect(0, 0, W, H);
+      }
+      // Cyan glass inner bezel ring
+      x.strokeStyle = 'rgba(56, 189, 248, 0.45)'; x.lineWidth = 3;
+      x.beginPath(); x.arc(cx, cy, 206, 0, Math.PI * 2); x.stroke();
+      for (let k = 0; k < 60; k++) {
+        const a = (k * Math.PI) / 30;
+        const maj = k % 5 === 0;
+        const r0 = maj ? 174 : 190;
+        const r1 = 200;
+        x.strokeStyle = k === 0 ? '#38bdf8' : maj ? '#f8fafc' : 'rgba(148,163,184,0.45)';
+        x.lineWidth = maj ? 5 : 2;
+        x.beginPath();
+        x.moveTo(cx + Math.sin(a) * r0, cy - Math.cos(a) * r0);
+        x.lineTo(cx + Math.sin(a) * r1, cy - Math.cos(a) * r1);
+        x.stroke();
+      }
+      return c;
+    },
+  },
+  {
+    id: 'glass_rose_eclipse', name: 'Rose Gold Eclipse', cat: 'glass', color: '#fbbf24',
+    mode: 'analog_clean', handPreset: 'gold_hollow',
+    dial: { style: 'none' },
+    draw() {
+      const [c, x] = canvas();
+      x.fillStyle = '#040307'; x.fillRect(0, 0, W, H);
+      const cx = W / 2, cy = H / 2;
+      blob(x, cx + 28, cy - 28, 225, 'rgba(244, 114, 182, 0.52)');
+      blob(x, cx - 20, cy + 24, 210, 'rgba(251, 191, 36, 0.52)');
+      x.fillStyle = '#06050a';
+      x.beginPath(); x.arc(cx - 8, cy + 8, 152, 0, Math.PI * 2); x.fill();
+      const rim = x.createLinearGradient(cx - 160, cy + 160, cx + 160, cy - 160);
+      rim.addColorStop(0, 'rgba(251,191,36,0.15)');
+      rim.addColorStop(0.55, '#fbbf24');
+      rim.addColorStop(1, '#f472b6');
+      x.strokeStyle = rim; x.lineWidth = 4;
+      x.beginPath(); x.arc(cx, cy, 168, 0, Math.PI * 2); x.stroke();
+      for (let k = 0; k < 12; k++) {
+        const a = (k * Math.PI) / 6;
+        x.fillStyle = k % 3 === 0 ? '#fde68a' : 'rgba(251,191,36,0.55)';
+        x.beginPath();
+        x.arc(cx + Math.sin(a) * 194, cy - Math.cos(a) * 194, k % 3 === 0 ? 6 : 3, 0, Math.PI * 2);
+        x.fill();
+      }
+      return c;
+    },
+  },
+  {
+    id: 'glass_stacked_aura', name: 'Frosted Pill Stacked', cat: 'glass', color: '#ffffff',
+    mode: 'digital',
+    clock: { x: 24, y: 74 }, clockSize: 54, clockLayout: 'stacked',
+    amPm: { x: 60, y: 48, size: 14 },
+    date: { x: 26, y: 196, visible: true, match: false, color: '#7dd3fc' },
+    dateShortWeek: true, dateShortMonth: true,
+    draw() {
+      const [c, x] = canvas();
+      x.fillStyle = '#050812'; x.fillRect(0, 0, W, H);
+      blob(x, 355, 195, 210, 'rgba(56, 189, 248, 0.75)');
+      blob(x, 330, 390, 220, 'rgba(139, 92, 246, 0.72)');
+      blob(x, 150, 440, 175, 'rgba(236, 72, 153, 0.48)');
+      // Left frosted glass pill container framing the stacked clock
+      const pg = x.createLinearGradient(28, 60, 260, 460);
+      pg.addColorStop(0, 'rgba(255,255,255,0.18)');
+      pg.addColorStop(1, 'rgba(255,255,255,0.04)');
+      x.fillStyle = pg;
+      x.strokeStyle = 'rgba(255,255,255,0.34)'; x.lineWidth = 3;
+      x.beginPath(); x.roundRect(28, 64, 224, 396, 48); x.fill(); x.stroke();
+      // Right decorative glass ring
+      x.strokeStyle = 'rgba(255,255,255,0.28)'; x.lineWidth = 2.5;
+      x.beginPath(); x.arc(356, 260, 84, 0, Math.PI * 2); x.stroke();
+      x.beginPath(); x.arc(356, 260, 48, 0, Math.PI * 2); x.stroke();
+      return c;
+    },
+  },
+  {
+    id: 'glass_cyber_wave', name: 'Silk Ribbon Wave', cat: 'glass', color: '#f8fafc',
+    mode: 'digital',
+    clock: { x: 46, y: 26 }, clockSize: 50, clockLayout: 'horizontal',
+    date: { x: 52, y: 84, visible: true, match: false, color: '#a5f3fc' },
+    dateShortWeek: true, dateShortMonth: true,
+    draw() {
+      const [c, x] = canvas();
+      x.fillStyle = '#04060e'; x.fillRect(0, 0, W, H);
+      const waves = [
+        [300, 52, 0.013, 0.0, 'rgba(139, 92, 246, 0.55)', '#c4b5fd'],
+        [355, 48, 0.015, 1.4, 'rgba(6, 182, 212, 0.50)', '#67e8f9'],
+        [415, 42, 0.012, 2.8, 'rgba(236, 72, 153, 0.45)', '#f9a8d4'],
+      ];
+      for (const [baseY, amp, freq, phase, fillCol, strokeCol] of waves) {
+        x.beginPath();
+        x.moveTo(0, H);
+        for (let px = 0; px <= W; px += 6) {
+          const py = baseY + Math.sin(px * freq + phase) * amp + Math.cos(px * freq * 0.6 - phase) * (amp * 0.4);
+          x.lineTo(px, py);
+        }
+        x.lineTo(W, H); x.closePath();
+        const wg = x.createLinearGradient(0, baseY - amp, 0, H);
+        wg.addColorStop(0, fillCol); wg.addColorStop(1, 'rgba(4,6,14,0.05)');
+        x.fillStyle = wg; x.fill();
+        x.strokeStyle = strokeCol; x.lineWidth = 3;
+        x.beginPath();
+        for (let px = 0; px <= W; px += 6) {
+          const py = baseY + Math.sin(px * freq + phase) * amp + Math.cos(px * freq * 0.6 - phase) * (amp * 0.4);
+          if (px === 0) x.moveTo(px, py); else x.lineTo(px, py);
+        }
+        x.stroke();
+      }
+      return c;
+    },
+  },
+  {
+    id: 'glass_zen_bauhaus', name: 'Bauhaus Glass Grid', cat: 'glass', color: '#fef3c7',
+    mode: 'digital',
+    clock: { x: 24, y: 40 }, clockSize: 54, clockLayout: 'stacked',
+    date: { x: 26, y: 156, visible: true, match: false, color: '#fda4af' },
+    dateShortWeek: true, dateShortMonth: true,
+    draw() {
+      const [c, x] = canvas();
+      x.fillStyle = '#0c0f17'; x.fillRect(0, 0, W, H);
+      // Subtle geometric grid lines
+      x.strokeStyle = 'rgba(255,255,255,0.07)'; x.lineWidth = 2;
+      for (let gx = 80; gx < W; gx += 80) { x.beginPath(); x.moveTo(gx, 0); x.lineTo(gx, H); x.stroke(); }
+      for (let gy = 80; gy < H; gy += 80) { x.beginPath(); x.moveTo(0, gy); x.lineTo(W, gy); x.stroke(); }
+      // Overlapping translucent Bauhaus circles & pill
+      x.fillStyle = 'rgba(244, 63, 94, 0.68)';
+      x.beginPath(); x.arc(330, 350, 128, 0, Math.PI * 2); x.fill();
+      x.fillStyle = 'rgba(20, 184, 166, 0.65)';
+      x.beginPath(); x.arc(220, 410, 108, 0, Math.PI * 2); x.fill();
+      x.fillStyle = 'rgba(251, 191, 36, 0.72)';
+      x.beginPath(); x.arc(356, 190, 68, 0, Math.PI * 2); x.fill();
+      x.strokeStyle = 'rgba(255,255,255,0.45)'; x.lineWidth = 3;
+      x.beginPath(); x.arc(330, 350, 128, 0, Math.PI * 2); x.stroke();
+      x.beginPath(); x.arc(220, 410, 108, 0, Math.PI * 2); x.stroke();
+      return c;
+    },
+  },
+  {
+    id: 'glass_emerald_halo', name: 'Emerald Matrix Halo', cat: 'glass', color: '#ecfdf5',
+    mode: 'digital',
+    clock: { x: 48, y: 214 }, clockSize: 48, clockLayout: 'horizontal',
+    amPm: { x: 194, y: 238, size: 13 },
+    date: { x: 48, y: 188, visible: false, match: true, color: '#6ee7b7' },
+    draw() {
+      const [c, x] = canvas();
+      x.fillStyle = '#030907'; x.fillRect(0, 0, W, H);
+      const cx = W / 2, cy = 216;
+      blob(x, cx, cy, 195, 'rgba(16, 185, 129, 0.45)');
+      const radii = [156, 122, 88, 54];
+      for (let i = 0; i < radii.length; i++) {
+        const r = radii[i];
+        x.strokeStyle = i % 2 === 0 ? '#34d399' : 'rgba(110, 231, 183, 0.42)';
+        x.lineWidth = i === 0 ? 4 : 2.5;
+        x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.stroke();
+        const dots = 24 - i * 4;
+        for (let k = 0; k < dots; k++) {
+          const a = (k * Math.PI * 2) / dots + i * 0.2;
+          x.fillStyle = '#a7f3d0';
+          x.beginPath();
+          x.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 3, 0, Math.PI * 2);
+          x.fill();
+        }
+      }
       return c;
     },
   },

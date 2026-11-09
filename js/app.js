@@ -122,7 +122,7 @@ export const FONT_CATALOG = [
 // ------------------------------------------------------------------ state
 const CLOCK_W = 139, CLOCK_H = 46, DATE_W = 186, DATE_H = 20;
 const DEFAULTS = {
-  presetId: 'nebula',
+  presetId: 'fav_gold_ribbon',
   zoom: 1, panX: 0, panY: 0, bright: 100, sat: 100, blur: 0, dim: 0,
   color: '#ffffff',
   clock: { x: 48, y: 20 },
@@ -828,7 +828,7 @@ async function restore() {
     const src = localStorage.getItem('nfs.src');
     const keep = { zoom: state.zoom, panX: state.panX, panY: state.panY };
     if (src) { setSource(fitCanvas(await loadImage(src)), null, true); }
-    else usePreset(state.presetId || 'nebula', !s);
+    else await usePreset(state.presetId || 'fav_gold_ribbon', !s);
     Object.assign(state, keep);
     if (state.analogBase) {
       const mode = Object.keys(ANALOG_BASES).find(k => ANALOG_BASES[k] === state.analogBase);
@@ -841,7 +841,7 @@ async function restore() {
       syncMotionTimer();
       refreshClockUI();
     }
-  } catch { usePreset('nebula'); }
+  } catch { await usePreset('fav_gold_ribbon'); }
   invalidate();
 }
 
@@ -1222,6 +1222,7 @@ const ANALOG_SAVED_IDS = new Set([
   'analog_classic', 'analog_color_x',
   'fav_gold_ribbon', 'fav_amber_sweep', 'fav_neon_outline', 'fav_crimson_x',
   'fav_indigo_stripes', 'fav_obsidian_sweep', 'fav_petal_mandala', 'fav_mint_stripes',
+  'glass_aurora_orb', 'glass_prism_dial', 'glass_titanium_sunray', 'glass_rose_eclipse',
   'pulse3_659', 'pulse3_1504', 'pulse3_1521',
 ]);
 
@@ -1229,6 +1230,7 @@ function renderFacesGrid(list, filter = '') {
   const q = filter.trim().toLowerCase();
   const byCat = list.filter(i => {
     if (activeSavedFaceCat === 'fav') return String(i.id || '').startsWith('fav_');
+    if (activeSavedFaceCat === 'glass') return String(i.id || '').startsWith('glass_');
     if (activeSavedFaceCat === 'pulse3') return i.kind === 'pulse3';
     if (activeSavedFaceCat === 'analog') return ANALOG_SAVED_IDS.has(i.id) || String(i.id || '').startsWith('analog_');
     if (activeSavedFaceCat === 'digital') return !ANALOG_SAVED_IDS.has(i.id) && !String(i.id || '').startsWith('analog_');

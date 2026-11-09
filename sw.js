@@ -1,5 +1,5 @@
 // Offline support: network-first so updates appear immediately, falling back to cache offline.
-const CACHE = 'noiseface-v31';
+const CACHE = 'noiseface-v32';
 const SHELL = ['./', 'index.html', 'css/style.css', 'js/app.js', 'js/format.js', 'js/ble.js', 'js/pulse3.js', 'js/pulse3face.js', 'js/notify.js', 'js/sprite.js', 'js/hands.js', 'js/motion.js', 'js/analog.js', 'js/presets.js', 'icon.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', e => {

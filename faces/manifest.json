@@ -72,6 +72,54 @@
     "size": 212660
   },
   {
+    "id": "glass_aurora_orb",
+    "file": "glass_aurora_orb.watch",
+    "name": "💎 Liquid Glass Orb",
+    "size": 555892
+  },
+  {
+    "id": "glass_prism_dial",
+    "file": "glass_prism_dial.watch",
+    "name": "💎 Frosted Prism Dial",
+    "size": 555032
+  },
+  {
+    "id": "glass_titanium_sunray",
+    "file": "glass_titanium_sunray.watch",
+    "name": "💎 Titanium Sunburst",
+    "size": 516934
+  },
+  {
+    "id": "glass_rose_eclipse",
+    "file": "glass_rose_eclipse.watch",
+    "name": "💎 Rose Gold Eclipse",
+    "size": 548366
+  },
+  {
+    "id": "glass_stacked_aura",
+    "file": "glass_stacked_aura.watch",
+    "name": "💎 Frosted Pill Stacked",
+    "size": 212660
+  },
+  {
+    "id": "glass_cyber_wave",
+    "file": "glass_cyber_wave.watch",
+    "name": "💎 Silk Ribbon Wave",
+    "size": 212660
+  },
+  {
+    "id": "glass_zen_bauhaus",
+    "file": "glass_zen_bauhaus.watch",
+    "name": "💎 Bauhaus Glass Grid",
+    "size": 212660
+  },
+  {
+    "id": "glass_emerald_halo",
+    "file": "glass_emerald_halo.watch",
+    "name": "💎 Emerald Matrix Halo",
+    "size": 212664
+  },
+  {
     "id": "p3_1423",
     "file": "pulse3/face_1423.bin",
     "name": "Cartoon Hip-Hop Mirror",
