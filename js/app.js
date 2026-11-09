@@ -128,6 +128,8 @@ const DEFAULTS = {
   clock: { x: 48, y: 20 },
   clockSize: 52,
   clockSpacing: 5,
+  clockLayout: 'horizontal', // 'horizontal' | 'stacked'
+  amPm: null,                // optional { x, y, size }
   clockFontFamily: 'system-ui, "Segoe UI", Roboto, sans-serif',
   date: { x: 27, y: 75, visible: true, match: true, color: '#ffffff' },
   label: { text: '', x: 120, y: 236, size: 22, color: '#ffffff', font: 'system-ui, "Segoe UI", Roboto, sans-serif' },
@@ -170,6 +172,12 @@ function clockDims() {
   const sz = state.clockSize || fontPx(state.clockFont) || 52;
   const kk = sz / 52;
   const sp = (state.clockSpacing ?? 5) - 5;
+  if (state.clockLayout === 'stacked') {
+    return {
+      w: Math.max(32, Math.round((64 + sp) * kk)),
+      h: Math.max(32, Math.round(98 * kk)),
+    };
+  }
   return {
     w: Math.max(36, Math.round((CLOCK_W + sp * 3) * kk)),
     h: Math.max(16, Math.round(CLOCK_H * kk)),
@@ -465,9 +473,22 @@ function drawOverlay(ctx, now) {
     ctx.restore();
     return;
   }
-  digit(hh[0], 0); digit(hh[1], 33 + sp);
-  digit(mm[0], 77 + sp * 2); digit(mm[1], 110 + sp * 3);
-  ctx.fillText(':', x + (69.5 + sp * 1.5) * k, y - 5 * k);
+  if (state.clockLayout === 'stacked') {
+    const dy = Math.round(48 * k);
+    ctx.fillText(hh[0], x + 14 * k, y - 2 * k, 32 * k);
+    ctx.fillText(hh[1], x + (47 + sp) * k, y - 2 * k, 32 * k);
+    ctx.fillText(mm[0], x + 14 * k, y + dy - 2 * k, 32 * k);
+    ctx.fillText(mm[1], x + (47 + sp) * k, y + dy - 2 * k, 32 * k);
+  } else {
+    digit(hh[0], 0); digit(hh[1], 33 + sp);
+    digit(mm[0], 77 + sp * 2); digit(mm[1], 110 + sp * 3);
+    ctx.fillText(':', x + (69.5 + sp * 1.5) * k, y - 5 * k);
+  }
+  if (state.amPm) {
+    ctx.font = `700 ${state.amPm.size || 14}px system-ui, "Segoe UI", Roboto, sans-serif`;
+    ctx.fillStyle = state.color;
+    ctx.fillText(now.getHours() >= 12 ? 'PM' : 'AM', state.amPm.x, state.amPm.y);
+  }
   if (state.date.visible) {
     const d = state.date;
     ctx.font = `600 ${fontPx(state.dateFont) <= 24 ? fontPx(state.dateFont) - 2 : 16}px system-ui, "Segoe UI", Roboto, sans-serif`;
@@ -543,9 +564,17 @@ function buildLayout() {
   const dSp = sp - 5;
   c.x_spacing_h = sp;
   c.x_spacing_m = sp;
-  c.x_hour = x; c.y_hour = y;
-  c.x_min = x + Math.round((77 + dSp * 2) * k); c.y_min = y;
-  c.x_point = x + Math.round((62 + dSp * 1.5) * k); c.y_point = y - Math.round(3 * k);
+  if (state.clockLayout === 'stacked') {
+    c.use_point = 0;
+    c.x_hour = x; c.y_hour = y;
+    c.x_min = x; c.y_min = Math.min(H0 - 24, y + Math.round(48 * k));
+    c.x_point = x; c.y_point = y;
+  } else {
+    c.use_point = 1;
+    c.x_hour = x; c.y_hour = y;
+    c.x_min = x + Math.round((77 + dSp * 2) * k); c.y_min = y;
+    c.x_point = x + Math.round((62 + dSp * 1.5) * k); c.y_point = y - Math.round(3 * k);
+  }
   const d = lay.WATCH.text_month_week;
   const [dr, dg, db] = hexToRgb(dateColor());
   d.visible = state.date.visible ? 1 : 0;
@@ -674,11 +703,93 @@ function setSource(canvas, presetId, persist) {
   invalidate();
 }
 
-function usePreset(id, applyColor = true) {
+async function usePreset(id, applyColor = true) {
   const p = PRESETS.find(p => p.id === id) || PRESETS[0];
   setSource(p.draw(), p.id, false);
-  if (applyColor) state.color = p.color;
+  if (applyColor) {
+    state.color = p.color;
+    Object.assign(state, { bright: 100, sat: 100, blur: 0, dim: 0 });
+    state.label = { ...state.label, text: '' };
+    if (p.mode && p.mode.startsWith('analog')) {
+      state.handPreset = p.handPreset || null;
+      state.hands = structuredClone(p.hands || HAND_PRESETS[p.handPreset] || HAND_PRESETS.swiss);
+      state.customHands = true;
+      state.dial = { ...defaultDial(), style: 'none', ...(p.dial || {}) };
+      state.clockLayout = 'horizontal';
+      state.amPm = null;
+      try {
+        await setClockMode(p.mode, { keep: true });
+        bindHandsUI.show?.();
+        bindDialUI.show?.();
+      } catch (e) { console.warn('Could not load analog base:', e); }
+    } else if (p.mode === 'digital') {
+      await setClockMode('digital', { keep: true });
+      state.clock = { ...(p.clock || { x: 48, y: 20 }) };
+      state.clockSize = p.clockSize || 52;
+      state.clockFont = state.clockSize >= 36 ? 50 : 18;
+      state.clockLayout = p.clockLayout || 'horizontal';
+      state.amPm = p.amPm ? { ...p.amPm } : null;
+      state.clockFontFamily = p.clockFontFamily || DEFAULTS.clockFontFamily;
+      state.date = { ...DEFAULTS.date, ...(p.date || {}), color: p.date?.color || p.color || '#ffffff' };
+      state.dateShortWeek = !!p.dateShortWeek;
+      state.dateShortMonth = !!p.dateShortMonth;
+    } else {
+      state.clockLayout = 'horizontal';
+      state.amPm = null;
+    }
+    refreshClockUI();
+  }
   invalidate();
+}
+
+function renderPresetCardThumb(p) {
+  const src = p.draw();
+  if (!p.mode) return src.toDataURL('image/jpeg', 0.78);
+  const c = Object.assign(document.createElement('canvas'), { width: W0, height: H0 });
+  const g = c.getContext('2d');
+  g.drawImage(src, 0, 0, W0, H0);
+  if (p.mode.startsWith('analog')) {
+    const d = p.hands || HAND_PRESETS[p.handPreset] || HAND_PRESETS.swiss;
+    for (const [kind, a] of [['hour', 304], ['minute', 48], ['second', 216]]) {
+      g.drawImage(putSprite(drawHand(kind, d, a)), 0, 0);
+    }
+    g.drawImage(putSprite(capSprite(d)), 0, 0);
+  } else if (p.mode === 'digital') {
+    const { x, y } = p.clock || { x: 48, y: 20 };
+    const sz = p.clockSize || 52;
+    const k = sz / 52;
+    const fam = p.clockFontFamily || 'system-ui, "Segoe UI", Roboto, sans-serif';
+    g.fillStyle = p.color || '#ffffff';
+    g.textBaseline = 'top';
+    g.textAlign = 'center';
+    g.font = `700 ${Math.round(sz)}px ${fam}`;
+    if (p.clockLayout === 'stacked') {
+      const dy = Math.round(48 * k);
+      g.fillText('0', x + 14 * k, y - 2 * k, 32 * k);
+      g.fillText('8', x + 47 * k, y - 2 * k, 32 * k);
+      g.fillText('2', x + 14 * k, y + dy - 2 * k, 32 * k);
+      g.fillText('6', x + 47 * k, y + dy - 2 * k, 32 * k);
+    } else {
+      g.fillText('0', x + 14 * k, y - 2 * k, 32 * k);
+      g.fillText('8', x + 47 * k, y - 2 * k, 32 * k);
+      g.fillText(':', x + 69.5 * k, y - 5 * k);
+      g.fillText('2', x + 91 * k, y - 2 * k, 32 * k);
+      g.fillText('6', x + 124 * k, y - 2 * k, 32 * k);
+      g.font = '600 14px system-ui, "Segoe UI", sans-serif';
+      g.fillText('AM', Math.min(W0 - 16, x + 154 * k), y + 26 * k);
+    }
+    if (p.amPm) {
+      g.font = `700 ${p.amPm.size || 14}px system-ui, "Segoe UI", sans-serif`;
+      g.fillText('AM', p.amPm.x, p.amPm.y);
+    }
+    if (p.date?.visible) {
+      g.font = '600 15px system-ui, "Segoe UI", sans-serif';
+      g.fillStyle = p.date.color || p.color || '#ffffff';
+      g.textAlign = 'left';
+      g.fillText('06 SAT', p.date.x, p.date.y);
+    }
+  }
+  return c.toDataURL('image/jpeg', 0.85);
 }
 
 // ------------------------------------------------------------------ persistence
@@ -939,7 +1050,7 @@ function bindInputs() {
     const b = Object.assign(document.createElement('button'), { className: 'preset', title: p.name });
     b.dataset.id = p.id;
     b.dataset.cat = p.cat || 'scenic';
-    const img = new Image(); img.alt = ''; img.src = p.draw().toDataURL('image/jpeg', 0.75);
+    const img = new Image(); img.alt = ''; img.src = renderPresetCardThumb(p);
     const sp = document.createElement('span'); sp.textContent = p.name;
     b.append(img, sp);
     b.onclick = () => usePreset(p.id);
@@ -1144,7 +1255,7 @@ async function drawFaceThumb(item, cv) {
       const r = await fetch(`faces/${item.file}`);
       if (!r.ok) return;
       const w = parseWatch(new Uint8Array(await r.arrayBuffer()));
-      const img = w.images.find(i => i.w === W0 && i.h === H0) || w.images[0];
+      const img = w.images.find(i => i.w === W1 && i.h === H1) || w.images.find(i => i.w === W0 && i.h === H0) || w.images[0];
       if (!img) return;
       src = Object.assign(document.createElement('canvas'), { width: img.w, height: img.h });
       src.getContext('2d').putImageData(new ImageData(decode565be(img.data, img.w, img.h), img.w, img.h), 0, 0);
@@ -1185,16 +1296,36 @@ async function importWatch(bytes, fname) {
       Object.assign(state, { bright: 100, sat: 100, blur: 0, dim: 0 });
       state.label = { ...state.label, text: '' };
       setSource(c, null, true);
+      const baseId = (fname || '').replace(/^.*\//, '').replace(/\.watch$/i, '');
+      const matchP = PRESETS.find(p => p.id === baseId);
       const tc = w.layout?.WATCH?.text_clock, tm = w.layout?.WATCH?.text_month_week;
       const isAnalog = !tc && (!!w.layout?.WATCH?.image_pointer_clock || w.images.length > 10);
       analogTemplateBytes = isAnalog ? bytes : null;
-      if (isAnalog) { state.analogBase = null; state.customHands = false; loadOriginalSprites(bytes); } else { originalSprites = null; state.analogBase = null; }
+      if (isAnalog) {
+        state.analogBase = null;
+        state.customHands = false;
+        if (matchP?.handPreset && HAND_PRESETS[matchP.handPreset]) {
+          state.handPreset = matchP.handPreset;
+          state.hands = structuredClone(HAND_PRESETS[matchP.handPreset]);
+        }
+        state.dial = { ...defaultDial(), style: 'none', ...(matchP?.dial || {}) };
+        loadOriginalSprites(bytes);
+      } else {
+        originalSprites = null;
+        state.analogBase = null;
+      }
       refreshClockUI();
       if (tc) {
         state.clock = { x: clamp(tc.x_hour ?? 48, 0, W0 - 40), y: clamp(tc.y_hour ?? 20, 3, H0 - 25) };
-        if (tc.text_id != null) { state.clockFont = tc.text_id; state.clockSize = KNOWN_FONTS[tc.text_id]?.px ?? 52; }
+        if (tc.text_id != null) { state.clockFont = tc.text_id; state.clockSize = matchP?.clockSize ?? KNOWN_FONTS[tc.text_id]?.px ?? 52; }
         if (tc.x_spacing_h != null) state.clockSpacing = tc.x_spacing_h;
         if (tc.color_r_h != null) state.color = rgbToHex(tc.color_r_h, tc.color_g_h, tc.color_b_h);
+        state.clockLayout = (tc.use_point === 0 && Math.abs((tc.y_min ?? tc.y_hour) - tc.y_hour) > 20) ? 'stacked' : (matchP?.clockLayout || 'horizontal');
+        state.amPm = matchP?.amPm ? { ...matchP.amPm } : null;
+        state.clockFontFamily = matchP?.clockFontFamily || DEFAULTS.clockFontFamily;
+      } else {
+        state.clockLayout = 'horizontal';
+        state.amPm = null;
       }
       if (tm) {
         const col = rgbToHex(tm.color_r ?? 255, tm.color_g ?? 255, tm.color_b ?? 255);
@@ -1842,8 +1973,34 @@ function bindBle() {
         return window.__installPulse3(orig.bytes, orig.faceId, orig.name);
       renderBg();
       const px = bg.getContext('2d').getImageData(0, 0, W0, H0).data;
-      const out = encodePulse3Face(await pulse3Template(), px, W0, H0);
-      log(`Converted design to Pulse 3 format (${out.length} bytes, analog hands from the template).`);
+      let elements = null;
+      if (analogTemplateBytes && state.hands) {
+        const crop = (spr, rx, ry, rw, rh) => {
+          const full = spriteToRGBA(spr);
+          const out = new Uint8Array(rw * rh * 4);
+          for (let y = 0; y < rh; y++) {
+            for (let x = 0; x < rw; x++) {
+              const si = ((ry + y) * W0 + (rx + x)) * 4;
+              const di = (y * rw + x) * 4;
+              out[di] = full[si]; out[di + 1] = full[si + 1]; out[di + 2] = full[si + 2]; out[di + 3] = full[si + 3];
+            }
+          }
+          return out;
+        };
+        const h66 = crop(drawHand('hour', state.hands, 0), 114, 56, 12, 168);
+        const h67 = crop(drawHand('minute', state.hands, 0), 114, 32, 12, 216);
+        const h68 = crop(drawHand('second', state.hands, 0), 110, 22, 20, 236);
+        const cap = crop(capSprite(state.hands), 110, 22, 20, 236);
+        for (let i = 0; i < 20 * 236; i++) {
+          const a = cap[4 * i + 3] / 255;
+          if (!a) continue;
+          for (let c = 0; c < 3; c++) h68[4 * i + c] = Math.round(cap[4 * i + c] * a + h68[4 * i + c] * (1 - a));
+          h68[4 * i + 3] = Math.min(255, Math.round(255 * (a + (h68[4 * i + 3] / 255) * (1 - a))));
+        }
+        elements = { 66: [h66], 67: [h67], 68: [h68] };
+      }
+      const out = encodePulse3Face(await pulse3Template(), px, W0, H0, { elements });
+      log(`Converted design to Pulse 3 format (${out.length} bytes${elements ? ', with custom analog hands' : ''}).`);
       return window.__installPulse3(out, P3_TEMPLATE.faceId, 'Custom face');
     }
     const data = $('#sendFile').checked && fileToSend ? fileToSend : buildFile();

@@ -258,6 +258,40 @@ export const HAND_STYLES = {
       { paths: [[[-w * 0.48, -len * 0.85], [0, -len], [w * 0.48, -len * 0.85], [w * 0.18, -len * 0.78], [-w * 0.18, -len * 0.78]]], fill: lume },
     ],
   },
+  capsule_hollow: {
+    label: 'Hollow capsule',
+    build: ({ len, w, tail, color }) => {
+      const hw = w / 2, t = Math.max(1.8, w * 0.22);
+      const ihw = Math.max(0.9, hw - t);
+      const base = Math.min(-9, tail);
+      const layers = [];
+      if (tail >= -4) {
+        layers.push({ paths: [rect(-Math.max(1.1, w * 0.13), base - 1, Math.max(1.1, w * 0.13), Math.max(0, tail))], fill: color });
+      }
+      layers.push({ paths: [capsule(hw, -len, base, 14), capsule(ihw, -len + t, base - t, 14)], fill: color });
+      return layers;
+    },
+  },
+  capsule_duo: {
+    label: 'Outlined capsule',
+    build: ({ len, w, tail, color, lume }) => {
+      const hw = w / 2, t = Math.max(1.8, w * 0.22);
+      const ihw = Math.max(0.9, hw - t);
+      const base = Math.min(-7, tail);
+      return [
+        { paths: [rect(-Math.max(1.2, w * 0.16), base - 1, Math.max(1.2, w * 0.16), Math.max(0, tail))], fill: color },
+        { paths: [capsule(hw, -len, base, 14)], fill: color },
+        { paths: [capsule(ihw, -len + t, base - t, 14)], fill: lume },
+      ];
+    },
+  },
+  capsule_flat: {
+    label: 'Flat capsule',
+    build: ({ len, w, tail, color, lume }) => [
+      { paths: [capsule(w / 2, -len, tail, 14)], fill: color },
+      { paths: [capsule(Math.max(1.1, w * 0.18), -len + w * 0.35, -len * 0.42, 12)], fill: lume },
+    ],
+  },
 };
 
 export const SECOND_STYLES = {
@@ -370,6 +404,46 @@ export const HAND_PRESETS = {
     minute: { style: 'line', len: 86, w: 7, tail: 14, color: '#38bdf8', lume: '#38bdf8' },
     second: { style: 'lollipop', len: 98, tail: 22, color: '#ef4444' },
     cap: { style: 'dot', color: '#ef4444', accent: '#ffffff' } },
+  gold_hollow: { name: 'Gold hollow (Fav 1)',
+    hour: { style: 'capsule_hollow', len: 58, w: 10, tail: 0, color: '#f5c518', lume: '#f5c518' },
+    minute: { style: 'capsule_hollow', len: 90, w: 9, tail: 0, color: '#f5c518', lume: '#f5c518' },
+    second: { style: 'line', len: 104, tail: 0, color: '#f5c518' },
+    cap: { style: 'ring', color: '#f5c518', accent: '#111111' } },
+  amber_hollow: { name: 'White hollow (Fav 2)',
+    hour: { style: 'capsule_hollow', len: 58, w: 9.5, tail: 0, color: '#ffffff', lume: '#ffffff' },
+    minute: { style: 'capsule_hollow', len: 90, w: 8.5, tail: 0, color: '#ffffff', lume: '#ffffff' },
+    second: { style: 'line', len: 102, tail: 22, color: '#e63917' },
+    cap: { style: 'ring', color: '#ffffff', accent: '#e63917' } },
+  violet_hollow: { name: 'Violet hollow (Fav 3)',
+    hour: { style: 'capsule_hollow', len: 56, w: 9.5, tail: -10, color: '#9b7ede', lume: '#9b7ede' },
+    minute: { style: 'capsule_hollow', len: 88, w: 8.5, tail: -10, color: '#9b7ede', lume: '#9b7ede' },
+    second: { style: 'line', len: 102, tail: 0, color: '#ffffff' },
+    cap: { style: 'ring', color: '#ffffff', accent: '#09090b' } },
+  crimson_solid: { name: 'Crimson white (Fav 4)',
+    hour: { style: 'capsule_flat', len: 58, w: 9, tail: 0, color: '#ffffff', lume: '#ffffff' },
+    minute: { style: 'capsule_flat', len: 92, w: 8, tail: 0, color: '#ffffff', lume: '#ffffff' },
+    second: { style: 'line', len: 104, tail: 0, color: '#facc15' },
+    cap: { style: 'ring', color: '#ffffff', accent: '#eab308' } },
+  indigo_baton: { name: 'Indigo slotted (Fav 5)',
+    hour: { style: 'capsule_flat', len: 58, w: 8.5, tail: 0, color: '#ffffff', lume: '#1e2448' },
+    minute: { style: 'capsule_flat', len: 90, w: 7.5, tail: 0, color: '#ffffff', lume: '#ffffff' },
+    second: { style: 'line', len: 102, tail: 0, color: '#cbd5e1' },
+    cap: { style: 'dot', color: '#ffffff', accent: '#ffffff' } },
+  obsidian_hollow: { name: 'Obsidian hollow (Fav 6)',
+    hour: { style: 'capsule_hollow', len: 58, w: 9.5, tail: 0, color: '#e5e7eb', lume: '#e5e7eb' },
+    minute: { style: 'capsule_hollow', len: 90, w: 8.5, tail: 0, color: '#e5e7eb', lume: '#e5e7eb' },
+    second: { style: 'line', len: 102, tail: 20, color: '#e5e7eb' },
+    cap: { style: 'ring', color: '#e5e7eb', accent: '#09090b' } },
+  petal_duo: { name: 'Petal dark-core (Fav 9)',
+    hour: { style: 'capsule_duo', len: 58, w: 9.5, tail: 0, color: '#ffffff', lume: '#141418' },
+    minute: { style: 'capsule_duo', len: 90, w: 8.5, tail: 0, color: '#ffffff', lume: '#141418' },
+    second: { style: 'line', len: 102, tail: 20, color: '#141418' },
+    cap: { style: 'ring', color: '#ffffff', accent: '#141418' } },
+  mint_solid: { name: 'Mint white (Fav 10)',
+    hour: { style: 'capsule_flat', len: 56, w: 8.5, tail: -10, color: '#ffffff', lume: '#ffffff' },
+    minute: { style: 'capsule_flat', len: 88, w: 7.5, tail: -10, color: '#ffffff', lume: '#ffffff' },
+    second: { style: 'line', len: 102, tail: 0, color: '#ffffff' },
+    cap: { style: 'ring', color: '#ffffff', accent: '#33968a' } },
 };
 
 export const defaultHands = () => structuredClone(HAND_PRESETS.swiss);

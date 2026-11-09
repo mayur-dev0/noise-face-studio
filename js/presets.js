@@ -31,7 +31,8 @@ function vignette(ctx, a = 0.55) {
 }
 
 export const PRESET_CATEGORIES = [
-  { id: 'all', label: 'All (80)' },
+  { id: 'all', label: 'All' },
+  { id: 'favourites', label: '💜 My Favourites (12)' },
   { id: 'crazy', label: '🔥 Crazy & Epic' },
   { id: 'pulse2', label: '⚡ Pulse 2 Pack (14)' },
   { id: 'amoled', label: 'Dark AMOLED' },
@@ -41,6 +42,545 @@ export const PRESET_CATEGORIES = [
 ];
 
 export const PRESETS = [
+  // ---- 12 Favourite Watchfaces (Exact Clock Type, Analog Hand Style & Artwork) ----
+  {
+    id: 'fav_gold_ribbon', name: 'Gold Ribbon 12·3·6·9', cat: 'favourites', color: '#f5c518',
+    mode: 'analog_clean', handPreset: 'gold_hollow',
+    dial: { style: 'none' },
+    draw() {
+      const [c, x] = canvas();
+      x.fillStyle = '#000000'; x.fillRect(0, 0, W, H);
+      x.lineCap = 'round';
+      // 4 corner gauge tracks + active progress arcs
+      const arc = (cx, cy, r, a0, a1, lw, col) => {
+        x.strokeStyle = col; x.lineWidth = lw;
+        x.beginPath(); x.arc(cx, cy, r, a0, a1); x.stroke();
+      };
+      // Top-left (teal steps)
+      arc(118, 118, 98, Math.PI, Math.PI * 1.5, 16, '#102e2a');
+      arc(118, 118, 98, Math.PI, Math.PI * 1.43, 16, '#4be0cb');
+      // Top-right (coral calories)
+      arc(W - 118, 118, 98, Math.PI * 1.5, Math.PI * 2, 16, '#331418');
+      arc(W - 118, 118, 98, Math.PI * 1.58, Math.PI * 2, 16, '#e65c65');
+      // Bottom-left (pink HR)
+      arc(118, H - 118, 98, Math.PI * 0.5, Math.PI, 16, '#ee528b');
+      // Bottom-right (gold battery)
+      arc(W - 118, H - 118, 98, 0, Math.PI * 0.5, 16, '#2b2208');
+      arc(W - 118, H - 118, 98, 0.08, Math.PI * 0.5, 16, '#e8b923');
+
+      // Mini corner status icons (boot, flame, heart, battery)
+      x.fillStyle = '#4be0cb';
+      x.fillRect(102, 86, 12, 18); x.fillRect(92, 100, 22, 8);
+      x.fillStyle = '#e65c65';
+      x.beginPath(); x.arc(378, 98, 10, 0, Math.PI * 2); x.fill();
+      x.fillStyle = '#ee528b';
+      x.beginPath(); x.arc(98, 460, 9, 0, Math.PI * 2); x.fill();
+      x.fillStyle = '#e8b923';
+      x.fillRect(368, 450, 18, 22);
+
+      // Oversized 3D folded gold ribbon numerals: 12, 9, 3, 6
+      const gold = '#f2be42', fold = '#b8861c';
+      // --- "12" at top (x: 126..354, y: 6..138) ---
+      x.fillStyle = gold;
+      // "1" flag + stem + wide base
+      x.beginPath();
+      x.moveTo(135, 16); x.lineTo(182, 4); x.lineTo(182, 44); x.lineTo(135, 56); x.closePath();
+      x.fill();
+      x.fillRect(179, 4, 4, 96);
+      x.fillRect(126, 98, 104, 40);
+      // "2" ribbon arch + diagonal sweep + folded corner
+      x.beginPath();
+      x.moveTo(232, 46);
+      x.bezierCurveTo(232, -2, 354, -2, 354, 46);
+      x.bezierCurveTo(354, 72, 286, 76, 280, 138);
+      x.lineTo(232, 138);
+      x.bezierCurveTo(234, 86, 338, 68, 344, 46);
+      x.lineTo(232, 46);
+      x.closePath();
+      x.fill();
+      x.fillRect(232, 134, 122, 4);
+      x.beginPath();
+      x.moveTo(314, 98); x.lineTo(354, 98); x.lineTo(354, 138); x.closePath();
+      x.fill();
+
+      // Helper for 3D folded circular ribbon numerals (9, 3, 6)
+      const ribbonCircle = (cx, cy, r) => {
+        x.fillStyle = gold;
+        x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill();
+      };
+      // --- "9" at left (cx=68, cy=280, r=65) ---
+      ribbonCircle(68, 280, 65);
+      x.fillStyle = '#000000';
+      x.beginPath(); x.roundRect(12, 254, 112, 25, 12); x.fill();
+      x.beginPath(); x.roundRect(10, 283, 114, 24, 12); x.fill();
+      x.strokeStyle = fold; x.lineWidth = 3;
+      x.beginPath(); x.arc(24, 267, 13, Math.PI * 0.5, Math.PI * 1.5); x.stroke();
+      x.beginPath(); x.arc(112, 267, 13, -Math.PI * 0.5, Math.PI * 0.5); x.stroke();
+
+      // --- "3" at right (cx=412, cy=280, r=65) ---
+      ribbonCircle(412, 280, 65);
+      x.fillStyle = '#000000';
+      x.beginPath(); x.roundRect(350, 254, 114, 24, 12); x.fill();
+      x.beginPath(); x.roundRect(350, 282, 114, 24, 12); x.fill();
+      x.fillStyle = gold;
+      x.fillRect(372, 276, 86, 6);
+
+      // --- "6" at bottom (cx=240, cy=486, r=65) ---
+      ribbonCircle(240, 486, 65);
+      x.fillStyle = '#000000';
+      x.beginPath(); x.roundRect(182, 460, 116, 24, 12); x.fill();
+      x.beginPath(); x.roundRect(184, 488, 112, 25, 12); x.fill();
+      x.strokeStyle = fold; x.lineWidth = 3;
+      x.beginPath(); x.arc(196, 500, 13, Math.PI * 0.5, Math.PI * 1.5); x.stroke();
+      x.beginPath(); x.arc(284, 500, 13, -Math.PI * 0.5, Math.PI * 0.5); x.stroke();
+
+      // Condensed gold labels: SATURDAY & 04/06
+      x.fillStyle = '#e5b228';
+      x.font = '700 22px "Bebas Neue", "Oswald", Impact, sans-serif';
+      x.textAlign = 'left'; x.textBaseline = 'middle';
+      x.fillText('SATURDAY', 8, 180);
+      x.textAlign = 'right';
+      x.fillText('04/06', W - 8, 376);
+      x.fillStyle = '#ee528b';
+      x.textAlign = 'left';
+      x.fillText('102', 8, 424);
+      return c;
+    },
+  },
+  {
+    id: 'fav_amber_sweep', name: 'Amber Conic Sweep', cat: 'favourites', color: '#ffffff',
+    mode: 'analog_clean', handPreset: 'amber_hollow',
+    dial: { style: 'none' },
+    draw() {
+      const [c, x] = canvas();
+      const cx = W / 2, cy = H / 2;
+      if (typeof x.createConicGradient === 'function') {
+        const cg = x.createConicGradient(Math.PI * 0.5, cx, cy);
+        cg.addColorStop(0.000, '#ec9806');
+        cg.addColorStop(0.180, '#f3a212');
+        cg.addColorStop(0.355, '#f9af22');
+        cg.addColorStop(0.360, '#f5a515');
+        cg.addColorStop(0.664, '#f8ad1e');
+        cg.addColorStop(0.668, '#f4a616');
+        cg.addColorStop(0.850, '#fab224');
+        cg.addColorStop(1.000, '#fdb82c');
+        x.fillStyle = cg;
+        x.fillRect(0, 0, W, H);
+      } else {
+        x.fillStyle = '#f6a818'; x.fillRect(0, 0, W, H);
+      }
+      return c;
+    },
+  },
+  {
+    id: 'fav_neon_outline', name: 'Neon Dots & Outline', cat: 'favourites', color: '#9b7ede',
+    mode: 'analog_clean', handPreset: 'violet_hollow',
+    dial: { style: 'none' },
+    draw() {
+      const [c, x] = canvas();
+      x.fillStyle = '#000000'; x.fillRect(0, 0, W, H);
+      // 4 glowing neon cardinal dots (top green, right pink, bottom amber, left cyan)
+      const dots = [
+        [W / 2, 56, '#65f02b'],
+        [W - 52, H / 2, '#eb2f6d'],
+        [W / 2, H - 56, '#f29e24'],
+        [52, H / 2, '#24cbf2'],
+      ];
+      for (const [dx, dy, col] of dots) {
+        const g = x.createRadialGradient(dx, dy, 2, dx, dy, 22);
+        g.addColorStop(0, col);
+        g.addColorStop(0.55, col);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        x.fillStyle = g;
+        x.beginPath(); x.arc(dx, dy, 22, 0, Math.PI * 2); x.fill();
+      }
+      // Outlined slanted bold numerals 12, 3, 6, 9
+      x.font = 'italic 800 76px "Montserrat", "Segoe UI", Arial, sans-serif';
+      x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.lineJoin = 'round';
+      x.strokeStyle = '#a8b0bc'; x.lineWidth = 4;
+      x.fillStyle = '#000000';
+      const nums = [
+        ['12', W / 2 - 4, 126],
+        ['3', W - 118, H / 2 + 4],
+        ['6', W / 2 - 2, H - 126],
+        ['9', 114, H / 2 + 4],
+      ];
+      for (const [txt, nx, ny] of nums) {
+        x.strokeText(txt, nx, ny);
+        x.fillText(txt, nx, ny);
+      }
+      return c;
+    },
+  },
+  {
+    id: 'fav_crimson_x', name: 'Crimson Layered X', cat: 'favourites', color: '#ffffff',
+    mode: 'analog_clean', handPreset: 'crimson_solid',
+    dial: { style: 'none' },
+    draw() {
+      const [c, x] = canvas();
+      x.fillStyle = '#000000'; x.fillRect(0, 0, W, H);
+      const cx = W / 2, cy = H / 2;
+      const dx = 132, dy = 156;
+      const layers = [
+        [324, '#310408'],
+        [270, '#5a0410'],
+        [216, '#8c0821'],
+        [162, '#de1031'],
+        [108, '#ef1039'],
+      ];
+      x.lineCap = 'round';
+      for (const [lw, col] of layers) {
+        x.strokeStyle = col;
+        x.lineWidth = lw;
+        x.beginPath();
+        x.moveTo(cx - dx, cy - dy); x.lineTo(cx + dx, cy + dy);
+        x.moveTo(cx + dx, cy - dy); x.lineTo(cx - dx, cy + dy);
+        x.stroke();
+      }
+      return c;
+    },
+  },
+  {
+    id: 'fav_indigo_stripes', name: 'Indigo Diagonal Stripes', cat: 'favourites', color: '#ffffff',
+    mode: 'analog_clean', handPreset: 'indigo_baton',
+    dial: { style: 'none' },
+    draw() {
+      const [c, x] = canvas();
+      const sw = 34;
+      // Upper-left vertical stripes (#222649 / #0e1123)
+      for (let i = 0; i * sw < W; i++) {
+        x.fillStyle = i % 2 === 0 ? '#222649' : '#0e1123';
+        x.fillRect(i * sw, 0, sw + 1, H);
+      }
+      // Lower-right triangle clipped along diagonal from (28, H-28) to (W-28, 28)
+      x.save();
+      x.beginPath();
+      x.moveTo(0, H);
+      x.lineTo(W, 0);
+      x.lineTo(W, H);
+      x.closePath();
+      x.clip();
+      for (let j = 0; j * sw < H; j++) {
+        x.fillStyle = j % 2 === 0 ? '#3a447f' : '#262d5a';
+        x.fillRect(0, j * sw, W, sw + 1);
+      }
+      // Subtle diagonal fold shadow along the seam
+      const sh = x.createLinearGradient(W * 0.42, H * 0.42, W * 0.56, H * 0.56);
+      sh.addColorStop(0, 'rgba(0,0,0,0.45)');
+      sh.addColorStop(1, 'rgba(0,0,0,0)');
+      x.fillStyle = sh;
+      x.fillRect(0, 0, W, H);
+      x.restore();
+      return c;
+    },
+  },
+  {
+    id: 'fav_obsidian_sweep', name: 'Obsidian Conic Sweep', cat: 'favourites', color: '#e5e7eb',
+    mode: 'analog_clean', handPreset: 'obsidian_hollow',
+    dial: { style: 'none' },
+    draw() {
+      const [c, x] = canvas();
+      const cx = W / 2, cy = H / 2;
+      if (typeof x.createConicGradient === 'function') {
+        const cg = x.createConicGradient(Math.PI * 0.5, cx, cy);
+        cg.addColorStop(0.000, '#060607');
+        cg.addColorStop(0.180, '#141416');
+        cg.addColorStop(0.450, '#2c2c2f');
+        cg.addColorStop(0.664, '#3c3c40');
+        cg.addColorStop(0.668, '#101012');
+        cg.addColorStop(0.840, '#242427');
+        cg.addColorStop(1.000, '#3e3e42');
+        x.fillStyle = cg;
+        x.fillRect(0, 0, W, H);
+      } else {
+        x.fillStyle = '#18181b'; x.fillRect(0, 0, W, H);
+      }
+      return c;
+    },
+  },
+  {
+    id: 'fav_acid_marble', name: 'Acid Lime Fluid Marble', cat: 'favourites', color: '#ffffff',
+    mode: 'digital',
+    clock: { x: 14, y: 24 }, clockSize: 46, clockLayout: 'horizontal',
+    date: { x: 14, y: 78, visible: true, match: false, color: '#cbd5e1' },
+    dateShortWeek: true, dateShortMonth: true,
+    draw() {
+      const [c, x] = canvas();
+      x.fillStyle = '#030605'; x.fillRect(0, 0, W, H);
+      const img = x.getImageData(0, 0, W, H), d = img.data;
+      // Continuous diagonal fluid alcohol-ink marble ribbons matching fav_07
+      for (let py = 0; py < H; py++) {
+        const ny = py / H;
+        for (let px = 0; px < W; px++) {
+          const nx = px / W;
+          const u = (nx * 0.76 + ny * 0.65) - 0.42;
+          const v = (nx * 0.65 - ny * 0.76);
+          const warp = Math.sin(v * 7.2 + Math.sin(u * 10.5 + v * 4.0) * 1.3) * 0.09
+                     + Math.cos(v * 14.0 - u * 8.0) * 0.04;
+          const m = u + warp;
+          let r = 4, g = 8, b = 7;
+          if (u < -0.02 && nx > 0.24 && ny < 0.26) {
+            const tw = Math.sin(nx * 22 + Math.cos(ny * 28) * 2.0);
+            if (tw > 0.3) {
+              const k = (tw - 0.3) / 0.7;
+              r = Math.round(18 * k); g = Math.round(220 * k); b = Math.round(190 * k);
+            }
+          } else if (m > -0.02) {
+            const band = Math.sin(m * 24.0 + Math.sin(v * 11.0) * 1.5);
+            const sub = Math.cos(m * 48.0 - v * 14.0);
+            if (m < 0.17) {
+              // Broad glowing acid-yellow diagonal river
+              const t = Math.max(0, Math.min(1, (band + 1) * 0.55));
+              r = Math.round(205 + 50 * t);
+              g = Math.round(242 + 13 * t);
+              b = Math.round(12 + 25 * (1 - t));
+              if (sub < -0.78) { r = 12; g = 68; b = 52; }
+            } else if (m < 0.52) {
+              // Flowing emerald, neon-lime, and cyan marble streams
+              if (band > 0.18) {
+                r = 175; g = 250; b = 22;
+              } else if (band > -0.32) {
+                r = 14; g = 222; b = 108;
+              } else if (sub > -0.1) {
+                r = 16; g = 162; b = 188;
+              } else {
+                r = 5; g = 14; b = 16;
+              }
+            } else {
+              // Bottom-right dark obsidian pocket with sparse glowing lime droplets
+              const d1 = Math.hypot(nx - 0.84, ny - 0.82);
+              const d2 = Math.hypot(nx - 0.75, ny - 0.90);
+              const d3 = Math.hypot(nx - 0.91, ny - 0.72);
+              if (d1 < 0.032 || d2 < 0.028 || d3 < 0.025 || band > 0.62) {
+                r = 215; g = 248; b = 32;
+              } else if (band > 0.35) {
+                r = 16; g = 195; b = 105;
+              } else {
+                r = 4; g = 8; b = 8;
+              }
+            }
+          }
+          const idx = (py * W + px) * 4;
+          d[idx] = r; d[idx + 1] = g; d[idx + 2] = b; d[idx + 3] = 255;
+        }
+      }
+      x.putImageData(img, 0, 0);
+      return c;
+    },
+  },
+  {
+    id: 'fav_rainbow_spiro', name: 'Rainbow Spirograph', cat: 'favourites', color: '#ffffff',
+    mode: 'digital',
+    clock: { x: 48, y: 218 }, clockSize: 48, clockLayout: 'horizontal',
+    date: { x: 27, y: 256, visible: false, match: true, color: '#ffffff' },
+    draw() {
+      const [c, x] = canvas();
+      x.fillStyle = '#000000'; x.fillRect(0, 0, W, H);
+      const cx = W / 2, cy = 228;
+      // Multi-stop pastel gradient matching fav_08
+      const g = x.createLinearGradient(cx - 190, cy - 190, cx + 190, cy + 190);
+      g.addColorStop(0.00, '#c8d69b');
+      g.addColorStop(0.28, '#e88ea4');
+      g.addColorStop(0.55, '#c988ba');
+      g.addColorStop(0.78, '#8b68a8');
+      g.addColorStop(1.00, '#78c6ce');
+      x.strokeStyle = g;
+      x.lineWidth = 2.4;
+      // 18 eccentric circles (R0 = 134, E = 58 -> outer radius 192, inner hole radius 76)
+      const N = 18, R0 = 134, E = 58;
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * Math.PI * 2;
+        x.beginPath();
+        x.arc(cx + Math.cos(a) * E, cy + Math.sin(a) * E, R0, 0, Math.PI * 2);
+        x.stroke();
+      }
+      // Outer and inner subtle ring harmonic
+      x.lineWidth = 1.6;
+      for (let i = 0; i < N; i++) {
+        const a = ((i + 0.5) / N) * Math.PI * 2;
+        x.beginPath();
+        x.ellipse(cx, cy, 190, 76, a, 0, Math.PI * 2);
+        x.stroke();
+      }
+      return c;
+    },
+  },
+  {
+    id: 'fav_petal_mandala', name: 'Coral Petal Rosette', cat: 'favourites', color: '#ffffff',
+    mode: 'analog_clean', handPreset: 'petal_duo',
+    dial: { style: 'none' },
+    draw() {
+      const [c, x] = canvas();
+      x.fillStyle = '#000000'; x.fillRect(0, 0, W, H);
+      const cx = W / 2, cy = H / 2;
+      const D = 95, R = 95, R2 = R * R;
+      const centers = Array.from({ length: 8 }, (_, k) => [
+        cx + D * Math.cos((k * Math.PI) / 4),
+        cy + D * Math.sin((k * Math.PI) / 4),
+      ]);
+      // Colors for overlap multiplicity: 1 -> #85869d, 2/4 -> #dcd6d8, 3 -> #da6562
+      const palette = {
+        0: [0, 0, 0],
+        1: [133, 134, 157],
+        2: [220, 214, 216],
+        3: [218, 101, 98],
+        4: [220, 214, 216],
+        5: [218, 101, 98],
+        6: [220, 214, 216],
+        7: [218, 101, 98],
+        8: [220, 214, 216],
+      };
+      const img = x.getImageData(0, 0, W, H), d = img.data;
+      const y0 = Math.max(0, Math.floor(cy - 194)), y1 = Math.min(H - 1, Math.ceil(cy + 194));
+      const x0 = Math.max(0, Math.floor(cx - 194)), x1 = Math.min(W - 1, Math.ceil(cx + 194));
+      for (let py = y0; py <= y1; py++) {
+        for (let px = x0; px <= x1; px++) {
+          let rAcc = 0, gAcc = 0, bAcc = 0;
+          for (const sy of [-0.25, 0.25]) {
+            for (const sx of [-0.25, 0.25]) {
+              const ux = px + 0.5 + sx, uy = py + 0.5 + sy;
+              let cnt = 0;
+              for (let k = 0; k < 8; k++) {
+                const dx = ux - centers[k][0], dy = uy - centers[k][1];
+                if (dx * dx + dy * dy <= R2) cnt++;
+              }
+              const col = palette[cnt];
+              rAcc += col[0]; gAcc += col[1]; bAcc += col[2];
+            }
+          }
+          const idx = (py * W + px) * 4;
+          d[idx] = rAcc >> 2; d[idx + 1] = gAcc >> 2; d[idx + 2] = bAcc >> 2; d[idx + 3] = 255;
+        }
+      }
+      x.putImageData(img, 0, 0);
+      return c;
+    },
+  },
+  {
+    id: 'fav_mint_stripes', name: 'Mint Geometric Stripes', cat: 'favourites', color: '#ffffff',
+    mode: 'analog_clean', handPreset: 'mint_solid',
+    dial: { style: 'none' },
+    draw() {
+      const [c, x] = canvas();
+      x.fillStyle = '#4cc1af'; x.fillRect(0, 0, W, H);
+      x.fillStyle = '#33968a';
+      // 1. Left vertical stripes with 45° beveled tops
+      const vBar = (bx, byTop, bw) => {
+        x.beginPath();
+        x.moveTo(bx, byTop);
+        x.lineTo(bx + bw, byTop + bw);
+        x.lineTo(bx + bw, H);
+        x.lineTo(bx, H);
+        x.closePath();
+        x.fill();
+      };
+      vBar(68, 74, 24);
+      vBar(122, 128, 24);
+
+      // 2. Upper-right 45° diagonal stripes clipped at y = 288
+      x.save();
+      x.beginPath();
+      x.rect(0, 0, W, 288);
+      x.clip();
+      for (const startX of [92, 168, 244, 320, 396]) {
+        x.beginPath();
+        x.moveTo(startX, 0);
+        x.lineTo(startX + 34, 0);
+        x.lineTo(startX + 34 + 288, 288);
+        x.lineTo(startX + 288, 288);
+        x.closePath();
+        x.fill();
+      }
+      x.restore();
+
+      // 3. Lower-right upward-tilted (-11°) horizontal stripes
+      for (const baseY of [356, 424, 492]) {
+        x.beginPath();
+        x.moveTo(234, baseY);
+        x.lineTo(W, baseY - 48);
+        x.lineTo(W, baseY - 48 + 28);
+        x.lineTo(234, baseY + 28);
+        x.closePath();
+        x.fill();
+      }
+      return c;
+    },
+  },
+  {
+    id: 'fav_eccentric_circles', name: 'Minimal Eccentric Circles', cat: 'favourites', color: '#ffffff',
+    mode: 'digital',
+    clock: { x: 18, y: 84 }, clockSize: 52, clockLayout: 'stacked',
+    amPm: { x: 38, y: 66, size: 15 },
+    date: { x: 142, y: 58, visible: false, match: false, color: '#111111' },
+    draw() {
+      const [c, x] = canvas();
+      x.fillStyle = '#000000'; x.fillRect(0, 0, W, H);
+      // Top-left pale cyan circle arc
+      x.strokeStyle = '#a5dce0'; x.lineWidth = 5;
+      x.beginPath(); x.arc(104, 164, 128, 0, Math.PI * 2); x.stroke();
+      // Solid pastel blush-pink circle with dark "06"
+      x.fillStyle = '#efb9b7';
+      x.beginPath(); x.arc(284, 136, 50, 0, Math.PI * 2); x.fill();
+      x.fillStyle = '#141418';
+      x.font = '700 44px "Montserrat", "Segoe UI", sans-serif';
+      x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillText('06', 284, 138);
+      // 5 nested eccentric circles in the bottom-right quadrant
+      const rings = [
+        [336, 368, 178, '#d6686b'],
+        [352, 430, 114, '#4955a8'],
+        [358, 450, 92, '#6b3fa0'],
+        [362, 466, 76, '#6e4838'],
+        [368, 492, 50, '#253d38'],
+      ];
+      x.lineWidth = 4.5;
+      for (const [rx, ry, rr, col] of rings) {
+        x.strokeStyle = col;
+        x.beginPath(); x.arc(rx, ry, rr, 0, Math.PI * 2); x.stroke();
+      }
+      return c;
+    },
+  },
+  {
+    id: 'fav_neon_orbits', name: 'Neon Atomic Orbits', cat: 'favourites', color: '#ffffff',
+    mode: 'digital',
+    clock: { x: 64, y: 34 }, clockSize: 48, clockLayout: 'stacked',
+    clockFontFamily: '"Bebas Neue", "Oswald", Impact, sans-serif',
+    date: { x: 27, y: 204, visible: false, match: true, color: '#ffffff' },
+    draw() {
+      const [c, x] = canvas();
+      x.fillStyle = '#000000'; x.fillRect(0, 0, W, H);
+      const cx = W / 2, cy = 296;
+      const g = x.createLinearGradient(40, H - 40, W - 40, 60);
+      g.addColorStop(0.0, '#6ee7b7');
+      g.addColorStop(0.45, '#7dd3fc');
+      g.addColorStop(1.0, '#d884c8');
+      x.strokeStyle = g;
+      x.lineWidth = 4.5;
+      // 3 interlocking rotated stadium/pill orbits (0°, +60°, -60°)
+      for (const deg of [-60, 60, 0]) {
+        x.save();
+        x.translate(cx, cy);
+        x.rotate((deg * Math.PI) / 180);
+        x.beginPath();
+        x.roundRect(-126, -210, 252, 420, 126);
+        x.stroke();
+        x.restore();
+      }
+      // Clear the top-left opening where the stacked 08/26 clock sits
+      x.fillStyle = '#000000';
+      x.fillRect(110, 56, 126, 165);
+      // Bottom "06" and "AM" markers
+      x.fillStyle = '#ffffff';
+      x.font = '700 38px "Bebas Neue", "Oswald", sans-serif';
+      x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillText('06', cx, 416);
+      x.font = '600 26px "Montserrat", "Segoe UI", sans-serif';
+      x.fillText('AM', cx, 504);
+      return c;
+    },
+  },
   // ---- Original 10 presets (preserved as-is) ----
   {
     id: 'aurora', name: 'Aurora', cat: 'scenic', color: '#e8fff6',

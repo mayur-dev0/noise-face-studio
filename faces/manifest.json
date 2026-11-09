@@ -1,5 +1,77 @@
 [
   {
+    "id": "fav_gold_ribbon",
+    "file": "fav_gold_ribbon.watch",
+    "name": "💜 Gold Ribbon 12·3·6·9",
+    "size": 548366
+  },
+  {
+    "id": "fav_amber_sweep",
+    "file": "fav_amber_sweep.watch",
+    "name": "💜 Amber Conic Sweep",
+    "size": 555892
+  },
+  {
+    "id": "fav_neon_outline",
+    "file": "fav_neon_outline.watch",
+    "name": "💜 Neon Dots & Outline",
+    "size": 533576
+  },
+  {
+    "id": "fav_crimson_x",
+    "file": "fav_crimson_x.watch",
+    "name": "💜 Crimson Layered X",
+    "size": 519348
+  },
+  {
+    "id": "fav_indigo_stripes",
+    "file": "fav_indigo_stripes.watch",
+    "name": "💜 Indigo Diagonal Stripes",
+    "size": 516934
+  },
+  {
+    "id": "fav_obsidian_sweep",
+    "file": "fav_obsidian_sweep.watch",
+    "name": "💜 Obsidian Conic Sweep",
+    "size": 555032
+  },
+  {
+    "id": "fav_acid_marble",
+    "file": "fav_acid_marble.watch",
+    "name": "💜 Acid Lime Fluid Marble",
+    "size": 212656
+  },
+  {
+    "id": "fav_rainbow_spiro",
+    "file": "fav_rainbow_spiro.watch",
+    "name": "💜 Rainbow Spirograph",
+    "size": 212664
+  },
+  {
+    "id": "fav_petal_mandala",
+    "file": "fav_petal_mandala.watch",
+    "name": "💜 Coral Petal Rosette",
+    "size": 527454
+  },
+  {
+    "id": "fav_mint_stripes",
+    "file": "fav_mint_stripes.watch",
+    "name": "💜 Mint Geometric Stripes",
+    "size": 502296
+  },
+  {
+    "id": "fav_eccentric_circles",
+    "file": "fav_eccentric_circles.watch",
+    "name": "💜 Minimal Eccentric Circles",
+    "size": 212656
+  },
+  {
+    "id": "fav_neon_orbits",
+    "file": "fav_neon_orbits.watch",
+    "name": "💜 Neon Atomic Orbits",
+    "size": 212660
+  },
+  {
     "id": "p3_1423",
     "file": "pulse3/face_1423.bin",
     "name": "Cartoon Hip-Hop Mirror",

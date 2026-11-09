@@ -358,11 +358,11 @@ function over(dst, dw, dh, src, sw, sh, ox, oy, angleDeg = 0, cx = 0, cy = 0) {
 }
 const HAND_ANGLES = { 0x42: 304, 0x43: 49, 0x44: 216 }; // 10:08:36
 
-export function composePreview(raw, lay, bgRgba, { thumb = true } = {}) {
+export function composePreview(raw, lay, bgRgba, { thumb = true, newImages = null } = {}) {
   const bg = lay.tail.find((r) => r.id === 2), pv = lay.tail.find((r) => r.id === 1);
   const W = bg.w, H = bg.h, canvas = new Uint8Array(bgRgba);
   for (const rec of lay.elements) {
-    const f = decodeRecord(raw, rec)[0];
+    const f = newImages?.['elem:' + rec.id]?.[0] || decodeRecord(raw, rec)[0];
     const ang = HAND_ANGLES[rec.id];
     over(canvas, W, H, f, rec.w, rec.h, rec.x, rec.y, ang || 0, W / 2, H / 2);
   }
@@ -401,7 +401,12 @@ export function encodePulse3Face(templateBytes, rgbaBackground, w, h, opts = {})
     flat[4 * i + 3] = 255;
   }
   const imgs = { 'tail:2': [flat] };
-  if (!opts.keepPreview) imgs['tail:1'] = [composePreview(raw, lay, flat)];
+  if (opts.elements) {
+    for (const [id, frames] of Object.entries(opts.elements)) {
+      imgs['elem:' + id] = Array.isArray(frames) ? frames : [frames];
+    }
+  }
+  if (!opts.keepPreview) imgs['tail:1'] = [composePreview(raw, lay, flat, { newImages: imgs })];
   const out = packContainer(rebuildRaw(raw, lay, imgs), templateBytes);
   unpackContainer(out); // self-check
   return out;
